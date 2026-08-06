@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  proxy-service:
+    build: ./proxy-service
+    ports:
+      - "8080:8080"
+    depends_on:
+      - ml-service
+      - demo-app
+      - redis
+      - rabbitmq
+
+  ml-service:
+    build: ./ml-service
+    ports:
+      - "8000:8000"
+
+  demo-app:
+    build: ./demo-app
+    ports:
+      - "5000:5000"
+
+  dashboard:
+    build: ./dashboard
+    ports:
+      - "3000:3000"
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: edhir
+    ports:
+      - "5432:5432"
