@@ -1,5 +1,7 @@
 package com.edhir.proxy.engine;
 
+import com.edhir.proxy.model.Request;
+import com.edhir.proxy.model.Verdict;
 import org.springframework.stereotype.Component;
 import jakarta.servlet.http.HttpServletRequest;
 import io.github.bucket4j.Bucket;
@@ -28,5 +30,9 @@ public class RuleEngine {
         }
         
         return true;
+    }
+    public Verdict evaluateRequest(Request request) {
+        // TODO: Implement actual rule evaluation logic against rule definitions
+        return Verdict.ALLOW;
     }
 }

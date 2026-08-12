@@ -10,6 +10,7 @@ services:
       - demo-app
       - redis
       - rabbitmq
+      - postgres
 
   ml-service:
     build: ./ml-service
@@ -45,3 +46,8 @@ services:
       POSTGRES_DB: edhir
     ports:
       - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
