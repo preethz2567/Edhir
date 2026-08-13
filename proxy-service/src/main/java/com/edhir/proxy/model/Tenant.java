@@ -9,6 +9,8 @@ public class Tenant {
     private String apiKey;
     private String integrationMode;
     private LocalDateTime createdAt;
+    private String contactEmail;
+    private boolean isActive;
 
     // Getters and setters
     public UUID getId() { return id; }
@@ -25,4 +27,10 @@ public class Tenant {
     
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public String getContactEmail() { return contactEmail; }
+    public void setContactEmail(String contactEmail) { this.contactEmail = contactEmail; }
+
+    public boolean isActive() { return isActive; }
+    public void setActive(boolean active) { isActive = active; }
 }

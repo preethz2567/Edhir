@@ -30,7 +30,9 @@ public class TenantController {
         Tenant tenant = new Tenant();
         tenant.setId(id);
         tenant.setAppName("Placeholder App");
-        tenant.setIntegrationMode("API");
+        tenant.setIntegrationMode("sidecar");
+        tenant.setContactEmail("admin@example.com");
+        tenant.setActive(true);
         tenant.setCreatedAt(LocalDateTime.now());
         
         return ResponseEntity.ok(tenant);
@@ -38,13 +40,16 @@ public class TenantController {
 
     public static class TenantRequest {
         private String appName;
+        private String contactEmail;
+        private String integrationMode;
 
-        public String getAppName() {
-            return appName;
-        }
+        public String getAppName() { return appName; }
+        public void setAppName(String appName) { this.appName = appName; }
 
-        public void setAppName(String appName) {
-            this.appName = appName;
-        }
+        public String getContactEmail() { return contactEmail; }
+        public void setContactEmail(String contactEmail) { this.contactEmail = contactEmail; }
+
+        public String getIntegrationMode() { return integrationMode; }
+        public void setIntegrationMode(String integrationMode) { this.integrationMode = integrationMode; }
     }
 }
