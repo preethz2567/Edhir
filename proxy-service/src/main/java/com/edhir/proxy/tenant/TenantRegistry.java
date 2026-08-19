@@ -53,6 +53,13 @@ public class TenantRegistry {
     }
 
     /**
+     * Looks up a tenant by its UUID primary key. Used by TenantController GET /tenants/{id}.
+     */
+    public Optional<TenantEntity> findById(UUID id) {
+        return tenantRepository.findById(id);
+    }
+
+    /**
      * Looks up the full TenantEntity by API key. Used by the proxy to
      * obtain the tenantId for per-request scoped rule loading.
      */

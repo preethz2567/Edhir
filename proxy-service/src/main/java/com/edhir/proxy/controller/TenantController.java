@@ -28,7 +28,7 @@ public class TenantController {
 
     @GetMapping("/{id}")
     public ResponseEntity<?> getTenant(@PathVariable UUID id) {
-        return tenantRegistry.findByApiKey(id.toString())
+        return tenantRegistry.findById(id)
                 .map(entity -> {
                     Tenant dto = new Tenant();
                     dto.setId(entity.getId());

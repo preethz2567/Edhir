@@ -69,6 +69,13 @@ public class ProxyController {
     @RequestMapping("/**")
     public ResponseEntity<String> proxy(HttpServletRequest httpRequest) {
         long startMs = System.currentTimeMillis();
+        String uri = httpRequest.getRequestURI();
+
+        // Passthrough: paths served by dedicated controllers must not be proxied
+        if (uri.startsWith("/tenants") || uri.startsWith("/dashboard")) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("Path " + uri + " is not a proxy target");
+        }
 
         // ── Step 1: Validate API key ───────────────────────────────────────────
         String apiKey = httpRequest.getHeader("X-Api-Key");
@@ -157,11 +164,13 @@ public class ProxyController {
     private HttpHeaders copyHeaders(HttpServletRequest request) {
         HttpHeaders headers = new HttpHeaders();
         Enumeration<String> names = request.getHeaderNames();
-        while (names.hasMoreElements()) {
-            String name = names.nextElement();
-            // Drop the Edhir API key before forwarding
-            if (!name.equalsIgnoreCase("X-Api-Key")) {
-                headers.set(name, request.getHeader(name));
+        if (names != null) {
+            while (names.hasMoreElements()) {
+                String name = names.nextElement();
+                // Drop the Edhir API key before forwarding
+                if (!name.equalsIgnoreCase("X-Api-Key")) {
+                    headers.set(name, request.getHeader(name));
+                }
             }
         }
         return headers;
