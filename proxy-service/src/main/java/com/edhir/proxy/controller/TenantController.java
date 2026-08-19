@@ -6,7 +6,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
-import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/tenants")
@@ -20,22 +19,28 @@ public class TenantController {
 
     @PostMapping
     public ResponseEntity<String> registerTenant(@RequestBody TenantRequest request) {
-        String apiKey = tenantRegistry.registerTenant(request.getAppName());
+        String apiKey = tenantRegistry.registerTenant(
+                request.getAppName(),
+                request.getContactEmail(),
+                request.getIntegrationMode());
         return ResponseEntity.ok(apiKey);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Tenant> getTenant(@PathVariable UUID id) {
-        // TODO: Replace with actual database lookup
-        Tenant tenant = new Tenant();
-        tenant.setId(id);
-        tenant.setAppName("Placeholder App");
-        tenant.setIntegrationMode("sidecar");
-        tenant.setContactEmail("admin@example.com");
-        tenant.setActive(true);
-        tenant.setCreatedAt(LocalDateTime.now());
-        
-        return ResponseEntity.ok(tenant);
+    public ResponseEntity<?> getTenant(@PathVariable UUID id) {
+        return tenantRegistry.findByApiKey(id.toString())
+                .map(entity -> {
+                    Tenant dto = new Tenant();
+                    dto.setId(entity.getId());
+                    dto.setAppName(entity.getAppName());
+                    dto.setApiKey(entity.getApiKey());
+                    dto.setIntegrationMode(entity.getIntegrationMode());
+                    dto.setContactEmail(entity.getContactEmail());
+                    dto.setActive(entity.isActive());
+                    dto.setCreatedAt(entity.getCreatedAt());
+                    return ResponseEntity.ok(dto);
+                })
+                .orElse(ResponseEntity.notFound().build());
     }
 
     public static class TenantRequest {
