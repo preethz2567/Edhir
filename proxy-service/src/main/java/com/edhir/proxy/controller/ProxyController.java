@@ -11,12 +11,18 @@ import com.edhir.proxy.repository.RequestRepository;
 import com.edhir.proxy.repository.SessionRepository;
 import com.edhir.proxy.tenant.TenantRegistry;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.io.BufferedReader;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
@@ -24,20 +30,6 @@ import java.util.Enumeration;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * SidecarProxy — the main entry point for all traffic passing through Edhir.
- *
- * Synchronous pipeline (deterministic, Week 3):
- *   1. Validate X-Api-Key → reject with 401 if invalid
- *   2. Resolve / upsert session from client fingerprint
- *   3. Check rate limit (Redis token bucket) → reject with 429 if exhausted
- *   4. Evaluate rules (regex) → reject with 403 if matched
- *   5. Persist RequestEntity to DB
- *   6. Publish to RabbitMQ (async scoring by ml-service)
- *   7. Forward request to demo-app and return its response
- *
- * Week 4 additions: ML score check, adaptive threshold, honeypot routing.
- */
 @RestController
 public class ProxyController {
 
@@ -66,23 +58,20 @@ public class ProxyController {
         this.publisher = publisher;
     }
 
+    // Catch-all proxy handler. Spring resolves more specific mappings first,
+    // so /tenants/** and /dashboard/** are handled by their own controllers
+    // and never reach this method.
     @RequestMapping("/**")
     public ResponseEntity<String> proxy(HttpServletRequest httpRequest) {
         long startMs = System.currentTimeMillis();
-        String uri = httpRequest.getRequestURI();
 
-        // Passthrough: paths served by dedicated controllers must not be proxied
-        if (uri.startsWith("/tenants") || uri.startsWith("/dashboard")) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Path " + uri + " is not a proxy target");
-        }
-
-        // ── Step 1: Validate API key ───────────────────────────────────────────
+        // Step 1: Validate API key
         String apiKey = httpRequest.getHeader("X-Api-Key");
         if (!tenantRegistry.validateApiKey(apiKey)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body("Edhir: invalid or missing X-Api-Key");
         }
+
         Optional<TenantEntity> tenantOpt = tenantRegistry.findByApiKey(apiKey);
         if (tenantOpt.isEmpty()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -90,7 +79,7 @@ public class ProxyController {
         }
         TenantEntity tenant = tenantOpt.get();
 
-        // ── Step 2: Resolve session from fingerprint ───────────────────────────
+        // Step 2: Resolve or create session from client fingerprint
         String fingerprint = computeFingerprint(httpRequest);
         SessionEntity session = sessionRepository
                 .findByClientFingerprintAndTenantId(fingerprint, tenant.getId())
@@ -98,46 +87,51 @@ public class ProxyController {
         session.setLastSeenAt(LocalDateTime.now());
         sessionRepository.save(session);
 
-        // ── Step 3: Rate limit check ───────────────────────────────────────────
+        // Step 3: Rate limit check
         if (!rateLimiter.checkLimit(session.getId().toString())) {
             persistAndPublish(session, httpRequest, null, "block",
-                    (int)(System.currentTimeMillis() - startMs));
+                    (int) (System.currentTimeMillis() - startMs));
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .body("Edhir: rate limit exceeded");
         }
 
-        // ── Step 4: Rule engine evaluation ────────────────────────────────────
+        // Step 4: Rule engine evaluation
         String queryString = httpRequest.getQueryString();
-        Verdict verdict = ruleEngine.evaluate(
-                httpRequest.getRequestURI(), queryString, tenant.getId());
+        Verdict verdict = ruleEngine.evaluate(httpRequest.getRequestURI(), queryString, tenant.getId());
 
         if (verdict.isBlock()) {
             persistAndPublish(session, httpRequest, verdict.getMatchedRuleId(), "block",
-                    (int)(System.currentTimeMillis() - startMs));
+                    (int) (System.currentTimeMillis() - startMs));
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body("Edhir: request blocked by rule " + verdict.getMatchedRuleId());
         }
 
-        // ── Step 5 & 6: Forward to demo-app, persist, publish ─────────────────
+        // Step 5: Forward request to demo-app
         String targetUrl = demoAppUrl + httpRequest.getRequestURI()
                 + (queryString != null ? "?" + queryString : "");
-        String response;
+
+        String responseBody;
         try {
+            String requestBody = readBody(httpRequest);
             HttpHeaders headers = copyHeaders(httpRequest);
-            HttpEntity<String> entity = new HttpEntity<>(headers);
+            HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
             ResponseEntity<String> downstream = restTemplate.exchange(
                     targetUrl, HttpMethod.valueOf(httpRequest.getMethod()), entity, String.class);
-            response = downstream.getBody();
+            responseBody = downstream.getBody();
         } catch (Exception e) {
-            response = "demo-app unavailable: " + e.getMessage();
+            responseBody = "demo-app unavailable: " + e.getMessage();
         }
 
+        // Step 6: Persist and publish (always, regardless of downstream outcome)
         persistAndPublish(session, httpRequest, null, "allow",
-                (int)(System.currentTimeMillis() - startMs));
-        return ResponseEntity.ok(response);
+                (int) (System.currentTimeMillis() - startMs));
+
+        return ResponseEntity.ok(responseBody);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
 
     private SessionEntity createSession(String fingerprint, UUID tenantId) {
         SessionEntity s = new SessionEntity();
@@ -146,18 +140,33 @@ public class ProxyController {
         return sessionRepository.save(s);
     }
 
-    /** SHA-256(IP + User-Agent) — no raw PII stored. */
     private String computeFingerprint(HttpServletRequest request) {
-        String raw = request.getRemoteAddr()
-                + "|" + request.getHeader("User-Agent");
+        String raw = request.getRemoteAddr() + "|" + request.getHeader("User-Agent");
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             byte[] hash = md.digest(raw.getBytes(StandardCharsets.UTF_8));
             StringBuilder sb = new StringBuilder();
-            for (byte b : hash) sb.append(String.format("%02x", b));
+            for (byte b : hash) {
+                sb.append(String.format("%02x", b));
+            }
             return sb.toString();
         } catch (Exception e) {
-            return "unknown-" + raw.hashCode();
+            return "unknown-" + Math.abs(raw.hashCode());
+        }
+    }
+
+    private String readBody(HttpServletRequest request) {
+        try {
+            StringBuilder sb = new StringBuilder();
+            BufferedReader reader = request.getReader();
+            if (reader == null) return null;
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+            return sb.length() > 0 ? sb.toString() : null;
+        } catch (IOException e) {
+            return null;
         }
     }
 
@@ -167,7 +176,6 @@ public class ProxyController {
         if (names != null) {
             while (names.hasMoreElements()) {
                 String name = names.nextElement();
-                // Drop the Edhir API key before forwarding
                 if (!name.equalsIgnoreCase("X-Api-Key")) {
                     headers.set(name, request.getHeader(name));
                 }
