@@ -1,0 +1,26 @@
+# Build and Target
+target/
+build/
+dist/
+node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environment Variables
+.env
+.env.*
+!.env.*.example
+
+# Logs
+*.log
+logs/
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
