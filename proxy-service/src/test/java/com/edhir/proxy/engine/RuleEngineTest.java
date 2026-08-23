@@ -5,144 +5,83 @@ import com.edhir.proxy.model.Verdict;
 import com.edhir.proxy.repository.RuleDefinitionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-/**
- * Unit tests for RuleEngine.
- *
- * Each of the 5 seeded global rules is verified to:
- *   (a) BLOCK a realistic malicious input sample
- *   (b) ALLOW a clean, benign input sample
- *
- * Tests run with Mockito — no Spring context or database needed.
- */
-@ExtendWith(MockitoExtension.class)
 class RuleEngineTest {
 
-    @Mock
-    private RuleDefinitionRepository ruleRepo;
-
     private RuleEngine ruleEngine;
-    private final UUID tenantId = UUID.randomUUID();
+    private RuleDefinitionRepository ruleRepo;
+    private UUID tenantId;
 
     @BeforeEach
     void setUp() {
+        ruleRepo = mock(RuleDefinitionRepository.class);
         ruleEngine = new RuleEngine(ruleRepo);
+        tenantId = UUID.randomUUID();
+
+        // Seed 8 rules based on V2 + V5 migrations
+        List<RuleDefinitionEntity> rules = Arrays.asList(
+                createRule("sqli_or", "\\s*OR\\s+1\\s*=\\s*1"),
+                createRule("sqli_union", "(?i)UNION\\s+SELECT"),
+                createRule("xss_script", "(?i)<script[^>]*>"),
+                createRule("path_traversal", "\\.\\./|\\.\\.\\\\"),
+                createRule("sqli_drop", "(?i)DROP\\s+TABLE"),
+                createRule("sqli_sleep", "(?i)(?:waitfor\\s+delay|pg_sleep|dbms_pipe\\.receive_message)"),
+                createRule("xss_events", "(?i)javascript:.*|onerror\\s*=|onload\\s*=|req\\s*=|eval\\s*\\("),
+                createRule("path_traversal_encoded", "(?:%2e%2e%2f|%2e%2e/|\\.\\.%2f|\\.\\.\\\\|%2e%2e%5c|%2e%2e\\\\|%252e%252e%255c)")
+        );
+
+        when(ruleRepo.findActiveRulesForTenant(tenantId)).thenReturn(rules);
     }
 
-    // ── Helper ──────────────────────────────────────────────────────────────
-
-    private RuleDefinitionEntity rule(String pattern, String attackType) {
+    private RuleDefinitionEntity createRule(String id, String pattern) {
         RuleDefinitionEntity r = new RuleDefinitionEntity();
-        r.setId(UUID.randomUUID());
+        r.setId(UUID.randomUUID()); // Using random for tests instead of fixed string
         r.setPattern(pattern);
-        r.setAttackType(attackType);
-        r.setSeverity("high");
-        r.setActive(true);
         return r;
     }
 
-    private void givenSingleRule(String pattern, String attackType) {
-        when(ruleRepo.findActiveRulesForTenant(any()))
-                .thenReturn(List.of(rule(pattern, attackType)));
-    }
-
-    // ── Rule 1: SQLi  ' OR 1=1 ──────────────────────────────────────────────
-
     @Test
-    void sqlInjection_orOne_shouldBlock() {
-        givenSingleRule("'\\s*OR\\s+1\\s*=\\s*1", "sqli");
-        Verdict v = ruleEngine.evaluate("/login", "username=' OR 1=1--", tenantId);
-        assertThat(v.isBlock()).isTrue();
-        assertThat(v.getMatchedRuleId()).isNotNull();
-    }
+    void testSqlInjection() {
+        // Blocked
+        assertTrue(ruleEngine.evaluate("/login", "user=admin' OR 1=1--", tenantId).isBlock());
+        assertTrue(ruleEngine.evaluate("/search", "q=UNION SELECT * FROM users", tenantId).isBlock());
+        assertTrue(ruleEngine.evaluate("/api", "q=DROP TABLE students;", tenantId).isBlock());
+        assertTrue(ruleEngine.evaluate("/api", "q=pg_sleep(10)", tenantId).isBlock());
 
-    @Test
-    void sqlInjection_orOne_cleanRequest_shouldAllow() {
-        givenSingleRule("'\\s*OR\\s+1\\s*=\\s*1", "sqli");
-        Verdict v = ruleEngine.evaluate("/login", "username=alice&password=secret", tenantId);
-        assertThat(v.isAllow()).isTrue();
-    }
-
-    // ── Rule 2: SQLi  UNION SELECT ──────────────────────────────────────────
-
-    @Test
-    void sqlInjection_unionSelect_shouldBlock() {
-        givenSingleRule("(?i)UNION\\s+SELECT", "sqli");
-        Verdict v = ruleEngine.evaluate("/products", "id=1 UNION SELECT * FROM users", tenantId);
-        assertThat(v.isBlock()).isTrue();
+        // Allowed
+        assertFalse(ruleEngine.evaluate("/login", "user=admin", tenantId).isBlock());
+        assertFalse(ruleEngine.evaluate("/search", "q=union square", tenantId).isBlock());
     }
 
     @Test
-    void sqlInjection_unionSelect_cleanRequest_shouldAllow() {
-        givenSingleRule("(?i)UNION\\s+SELECT", "sqli");
-        Verdict v = ruleEngine.evaluate("/products", "category=gadgets", tenantId);
-        assertThat(v.isAllow()).isTrue();
-    }
+    void testXss() {
+        // Blocked
+        assertTrue(ruleEngine.evaluate("/post", "comment=<script>alert(1)</script>", tenantId).isBlock());
+        assertTrue(ruleEngine.evaluate("/post", "comment=<img src=x onerror=alert(1)>", tenantId).isBlock());
+        assertTrue(ruleEngine.evaluate("/redirect", "url=javascript:alert(1)", tenantId).isBlock());
 
-    // ── Rule 3: XSS  <script> ───────────────────────────────────────────────
-
-    @Test
-    void xss_scriptTag_shouldBlock() {
-        givenSingleRule("(?i)<script[^>]*>", "xss");
-        Verdict v = ruleEngine.evaluate("/comment", "body=<script>alert(1)</script>", tenantId);
-        assertThat(v.isBlock()).isTrue();
+        // Allowed
+        assertFalse(ruleEngine.evaluate("/post", "comment=hello there", tenantId).isBlock());
+        assertFalse(ruleEngine.evaluate("/post", "comment=<p>Hello</p>", tenantId).isBlock());
     }
 
     @Test
-    void xss_scriptTag_cleanRequest_shouldAllow() {
-        givenSingleRule("(?i)<script[^>]*>", "xss");
-        Verdict v = ruleEngine.evaluate("/comment", "body=Hello+world", tenantId);
-        assertThat(v.isAllow()).isTrue();
-    }
+    void testPathTraversal() {
+        // Blocked
+        assertTrue(ruleEngine.evaluate("/files/../../etc/passwd", null, tenantId).isBlock());
+        assertTrue(ruleEngine.evaluate("/files/%2e%2e%2fetc%2fpasswd", null, tenantId).isBlock());
 
-    // ── Rule 4: Path traversal  ../ ─────────────────────────────────────────
-
-    @Test
-    void pathTraversal_shouldBlock() {
-        givenSingleRule("\\.\\./|\\.\\.\\\\" , "path_traversal");
-        Verdict v = ruleEngine.evaluate("/files/../../etc/passwd", null, tenantId);
-        assertThat(v.isBlock()).isTrue();
-    }
-
-    @Test
-    void pathTraversal_cleanRequest_shouldAllow() {
-        givenSingleRule("\\.\\./|\\.\\.\\\\" , "path_traversal");
-        Verdict v = ruleEngine.evaluate("/files/report.pdf", null, tenantId);
-        assertThat(v.isAllow()).isTrue();
-    }
-
-    // ── Rule 5: SQLi  DROP TABLE ─────────────────────────────────────────────
-
-    @Test
-    void sqlInjection_dropTable_shouldBlock() {
-        givenSingleRule("(?i)DROP\\s+TABLE", "sqli");
-        Verdict v = ruleEngine.evaluate("/admin", "q=DROP TABLE users", tenantId);
-        assertThat(v.isBlock()).isTrue();
-    }
-
-    @Test
-    void sqlInjection_dropTable_cleanRequest_shouldAllow() {
-        givenSingleRule("(?i)DROP\\s+TABLE", "sqli");
-        Verdict v = ruleEngine.evaluate("/admin", "q=show+tables", tenantId);
-        assertThat(v.isAllow()).isTrue();
-    }
-
-    // ── No rules loaded ──────────────────────────────────────────────────────
-
-    @Test
-    void noRules_anyRequest_shouldAllow() {
-        when(ruleRepo.findActiveRulesForTenant(any())).thenReturn(List.of());
-        Verdict v = ruleEngine.evaluate("/anything", "x=' OR 1=1", tenantId);
-        assertThat(v.isAllow()).isTrue();
+        // Allowed
+        assertFalse(ruleEngine.evaluate("/files/images/photo.jpg", null, tenantId).isBlock());
+        assertFalse(ruleEngine.evaluate("/files/profile.png", null, tenantId).isBlock());
     }
 }

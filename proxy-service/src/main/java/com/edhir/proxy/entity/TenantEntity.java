@@ -30,6 +30,9 @@ public class TenantEntity {
     @Column(name = "is_active", nullable = false)
     private boolean isActive;
 
+    @Column(name = "fail_open", nullable = false)
+    private boolean failOpen = true;
+
     @PrePersist
     public void prePersist() {
         if (id == null) id = UUID.randomUUID();
@@ -57,4 +60,7 @@ public class TenantEntity {
 
     public boolean isActive() { return isActive; }
     public void setActive(boolean active) { isActive = active; }
+
+    public boolean isFailOpen() { return failOpen; }
+    public void setFailOpen(boolean failOpen) { this.failOpen = failOpen; }
 }

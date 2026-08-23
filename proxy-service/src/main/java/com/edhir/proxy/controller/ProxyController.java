@@ -10,7 +10,12 @@ import com.edhir.proxy.ratelimit.RateLimiter;
 import com.edhir.proxy.repository.RequestRepository;
 import com.edhir.proxy.repository.SessionRepository;
 import com.edhir.proxy.tenant.TenantRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.client.circuitbreaker.CircuitBreaker;
+import org.springframework.cloud.client.circuitbreaker.CircuitBreakerFactory;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -33,12 +38,15 @@ import java.util.UUID;
 @RestController
 public class ProxyController {
 
+    private static final Logger logger = LoggerFactory.getLogger(ProxyController.class);
+    
     private final TenantRegistry tenantRegistry;
     private final RateLimiter rateLimiter;
     private final RuleEngine ruleEngine;
     private final SessionRepository sessionRepository;
     private final RequestRepository requestRepository;
     private final RequestMetadataPublisher publisher;
+    private final CircuitBreakerFactory circuitBreakerFactory;
     private final RestTemplate restTemplate = new RestTemplate();
 
     @Value("${edhir.demo-app-url}")
@@ -49,89 +57,143 @@ public class ProxyController {
                            RuleEngine ruleEngine,
                            SessionRepository sessionRepository,
                            RequestRepository requestRepository,
-                           RequestMetadataPublisher publisher) {
+                           RequestMetadataPublisher publisher,
+                           CircuitBreakerFactory circuitBreakerFactory) {
         this.tenantRegistry = tenantRegistry;
         this.rateLimiter = rateLimiter;
         this.ruleEngine = ruleEngine;
         this.sessionRepository = sessionRepository;
         this.requestRepository = requestRepository;
         this.publisher = publisher;
+        this.circuitBreakerFactory = circuitBreakerFactory;
     }
 
-    // Catch-all proxy handler. Spring resolves more specific mappings first,
-    // so /tenants/** and /dashboard/** are handled by their own controllers
-    // and never reach this method.
     @RequestMapping("/**")
     public ResponseEntity<String> proxy(HttpServletRequest httpRequest) {
         long startMs = System.currentTimeMillis();
-
-        // Step 1: Validate API key
-        String apiKey = httpRequest.getHeader("X-Api-Key");
-        if (!tenantRegistry.validateApiKey(apiKey)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body("Edhir: invalid or missing X-Api-Key");
-        }
-
-        Optional<TenantEntity> tenantOpt = tenantRegistry.findByApiKey(apiKey);
-        if (tenantOpt.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body("Edhir: tenant not found");
-        }
-        TenantEntity tenant = tenantOpt.get();
-
-        // Step 2: Resolve or create session from client fingerprint
-        String fingerprint = computeFingerprint(httpRequest);
-        SessionEntity session = sessionRepository
-                .findByClientFingerprintAndTenantId(fingerprint, tenant.getId())
-                .orElseGet(() -> createSession(fingerprint, tenant.getId()));
-        session.setLastSeenAt(LocalDateTime.now());
-        sessionRepository.save(session);
-
-        // Step 3: Rate limit check
-        if (!rateLimiter.checkLimit(session.getId().toString())) {
-            persistAndPublish(session, httpRequest, null, "block",
-                    (int) (System.currentTimeMillis() - startMs));
-            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                    .body("Edhir: rate limit exceeded");
-        }
-
-        // Step 4: Rule engine evaluation
-        String queryString = httpRequest.getQueryString();
-        Verdict verdict = ruleEngine.evaluate(httpRequest.getRequestURI(), queryString, tenant.getId());
-
-        if (verdict.isBlock()) {
-            persistAndPublish(session, httpRequest, verdict.getMatchedRuleId(), "block",
-                    (int) (System.currentTimeMillis() - startMs));
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body("Edhir: request blocked by rule " + verdict.getMatchedRuleId());
-        }
-
-        // Step 5: Forward request to demo-app
-        String targetUrl = demoAppUrl + httpRequest.getRequestURI()
-                + (queryString != null ? "?" + queryString : "");
-
-        String responseBody;
+        String requestId = UUID.randomUUID().toString();
+        
         try {
-            String requestBody = readBody(httpRequest);
+            MDC.put("requestId", requestId);
+            
+            // Input Validation: prevent resource exhaustion
+            if (httpRequest.getRequestURI().length() > 2048) {
+                return ResponseEntity.status(HttpStatus.URI_TOO_LONG).body("URI too long");
+            }
+            if (httpRequest.getHeaderNames() != null) {
+                int headerCount = 0;
+                Enumeration<String> names = httpRequest.getHeaderNames();
+                while(names.hasMoreElements()) {
+                    names.nextElement();
+                    headerCount++;
+                }
+                if (headerCount > 100) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Too many headers");
+                }
+            }
+
+            // Step 1: Validate API key
+            String apiKey = httpRequest.getHeader("X-Api-Key");
+            if (!tenantRegistry.validateApiKey(apiKey)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body("Edhir: invalid or missing X-Api-Key");
+            }
+
+            Optional<TenantEntity> tenantOpt = tenantRegistry.findByApiKey(apiKey);
+            if (tenantOpt.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body("Edhir: tenant not found");
+            }
+            TenantEntity tenant = tenantOpt.get();
+            MDC.put("tenantId", tenant.getId().toString());
+
+            // Step 2: Resolve or create session from client fingerprint
+            String fingerprint = computeFingerprint(httpRequest);
+            SessionEntity session = resolveSessionSafe(fingerprint, tenant);
+            
+            // Step 3: Rate limit check (Fail-open aware)
+            boolean limitExceeded = false;
+            try {
+                if (!rateLimiter.checkLimit(session.getId().toString())) {
+                    limitExceeded = true;
+                }
+            } catch (Exception e) {
+                logger.warn("Rate limiter failed: {}", e.getMessage());
+                if (!tenant.isFailOpen()) {
+                    limitExceeded = true;
+                }
+            }
+            
+            if (limitExceeded) {
+                persistAndPublish(session, httpRequest, null, "block", startMs);
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                        .body("Edhir: rate limit exceeded");
+            }
+
+            // Step 4: Rule engine evaluation (Fail-open aware)
+            String queryString = httpRequest.getQueryString();
+            Verdict verdict = Verdict.allow();
+            try {
+                verdict = ruleEngine.evaluate(httpRequest.getRequestURI(), queryString, tenant.getId());
+            } catch (Exception e) {
+                logger.warn("Rule engine failed: {}", e.getMessage());
+                if (!tenant.isFailOpen()) {
+                    verdict = Verdict.block(null); // Block with no specific rule
+                }
+            }
+
+            if (verdict.isBlock()) {
+                persistAndPublish(session, httpRequest, verdict.getMatchedRuleId(), "block", startMs);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body("Edhir: request blocked by rule " + verdict.getMatchedRuleId());
+            }
+
+            // Step 5: Forward request to demo-app using Resilience4j
+            String targetUrl = demoAppUrl + httpRequest.getRequestURI()
+                    + (queryString != null ? "?" + queryString : "");
+
+            String requestBody = readBodySafe(httpRequest);
             HttpHeaders headers = copyHeaders(httpRequest);
             HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
-            ResponseEntity<String> downstream = restTemplate.exchange(
-                    targetUrl, HttpMethod.valueOf(httpRequest.getMethod()), entity, String.class);
-            responseBody = downstream.getBody();
-        } catch (Exception e) {
-            responseBody = "demo-app unavailable: " + e.getMessage();
+
+            CircuitBreaker cb = circuitBreakerFactory.create("demoApp");
+            ResponseEntity<String> downstream = cb.run(
+                () -> restTemplate.exchange(targetUrl, HttpMethod.valueOf(httpRequest.getMethod()), entity, String.class),
+                throwable -> ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body("demo-app unavailable: " + throwable.getMessage())
+            );
+
+            // Step 6: Persist and publish
+            persistAndPublish(session, httpRequest, null, "allow", startMs);
+
+            return ResponseEntity.status(downstream.getStatusCode())
+                    .headers(downstream.getHeaders())
+                    .body(downstream.getBody());
+                    
+        } finally {
+            MDC.clear();
         }
-
-        // Step 6: Persist and publish (always, regardless of downstream outcome)
-        persistAndPublish(session, httpRequest, null, "allow",
-                (int) (System.currentTimeMillis() - startMs));
-
-        return ResponseEntity.ok(responseBody);
     }
 
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    private SessionEntity resolveSessionSafe(String fingerprint, TenantEntity tenant) {
+        try {
+            SessionEntity session = sessionRepository
+                    .findByClientFingerprintAndTenantId(fingerprint, tenant.getId())
+                    .orElseGet(() -> createSession(fingerprint, tenant.getId()));
+            session.setLastSeenAt(LocalDateTime.now());
+            return sessionRepository.save(session);
+        } catch (Exception e) {
+            logger.warn("Session resolution failed, using ephemeral session: {}", e.getMessage());
+            SessionEntity ephemeral = new SessionEntity();
+            ephemeral.setId(UUID.randomUUID());
+            ephemeral.setTenantId(tenant.getId());
+            ephemeral.setClientFingerprint(fingerprint);
+            return ephemeral;
+        }
+    }
 
     private SessionEntity createSession(String fingerprint, UUID tenantId) {
         SessionEntity s = new SessionEntity();
@@ -155,7 +217,7 @@ public class ProxyController {
         }
     }
 
-    private String readBody(HttpServletRequest request) {
+    private String readBodySafe(HttpServletRequest request) {
         try {
             StringBuilder sb = new StringBuilder();
             BufferedReader reader = request.getReader();
@@ -185,15 +247,30 @@ public class ProxyController {
     }
 
     private void persistAndPublish(SessionEntity session, HttpServletRequest httpRequest,
-                                   UUID matchedRuleId, String verdict, int responseMs) {
-        RequestEntity req = new RequestEntity();
-        req.setSessionId(session.getId());
-        req.setPath(httpRequest.getRequestURI());
-        req.setMethod(httpRequest.getMethod());
-        req.setVerdict(verdict);
-        req.setMatchedRuleId(matchedRuleId);
-        req.setResponseTimeMs(responseMs);
-        requestRepository.save(req);
-        publisher.publish(req);
+                                   UUID matchedRuleId, String verdict, long startMs) {
+        int responseMs = (int) (System.currentTimeMillis() - startMs);
+        
+        MDC.put("verdict", verdict);
+        MDC.put("latency", String.valueOf(responseMs));
+        if (matchedRuleId != null) {
+            MDC.put("matchedRuleId", matchedRuleId.toString());
+        }
+        
+        // Structured log output (handled by Logstash encoder based on MDC context)
+        logger.info("Request processed");
+
+        try {
+            RequestEntity req = new RequestEntity();
+            req.setSessionId(session.getId());
+            req.setPath(httpRequest.getRequestURI());
+            req.setMethod(httpRequest.getMethod());
+            req.setVerdict(verdict);
+            req.setMatchedRuleId(matchedRuleId);
+            req.setResponseTimeMs(responseMs);
+            requestRepository.save(req);
+            publisher.publish(req);
+        } catch (Exception e) {
+            logger.error("Failed to persist request record: {}", e.getMessage());
+        }
     }
 }

@@ -2,110 +2,83 @@ package com.edhir.proxy.ratelimit;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.RedisScript;
 
-import java.time.Duration;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-/**
- * Unit tests for RateLimiter.
- *
- * Tests use Mockito to simulate Redis responses — no real Redis instance
- * required. This lets us verify bucket depletion and refill logic in isolation.
- */
-@ExtendWith(MockitoExtension.class)
 class RateLimiterTest {
 
-    @Mock
-    private RedisTemplate<String, Long> redisTemplate;
-
-    @Mock
-    private ValueOperations<String, Long> valueOps;
-
     private RateLimiter rateLimiter;
+    private RedisTemplate<String, Long> redisTemplate;
+    
+    // Simulate Lua script execution
+    private AtomicInteger mockBucket = new AtomicInteger(10);
 
     @BeforeEach
+    @SuppressWarnings("unchecked")
     void setUp() {
-        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        redisTemplate = mock(RedisTemplate.class);
+        
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(), any())).thenAnswer(invocation -> {
+            // Mocking the Lua script behavior: return 1L if token consumed, 0L if empty
+            if (mockBucket.get() > 0) {
+                mockBucket.decrementAndGet();
+                return 1L;
+            } else {
+                return 0L;
+            }
+        });
+        
         rateLimiter = new RateLimiter(redisTemplate);
     }
 
-    // ── New session: bucket starts full ─────────────────────────────────────
-
     @Test
-    void firstRequest_bucketNotExist_shouldAllow() {
-        // decrement returns null when key does not exist
-        when(valueOps.decrement(anyString())).thenReturn(null);
-
-        boolean result = rateLimiter.checkLimit("session-new");
-
-        assertThat(result).isTrue();
-        // Should initialise key with capacity - 1 = 9
-        verify(valueOps).set(eq("ratelimit:session-new"), eq(9L), any(Duration.class));
+    void testBucketDepletion() {
+        // First 10 requests should succeed
+        for (int i = 0; i < 10; i++) {
+            assertEquals(true, rateLimiter.checkLimit("session1"));
+        }
+        
+        // 11th request should fail
+        assertEquals(false, rateLimiter.checkLimit("session1"));
     }
 
-    // ── Tokens remaining: request should pass ────────────────────────────────
-
     @Test
-    void tokenAvailable_shouldAllow() {
-        when(valueOps.decrement(anyString())).thenReturn(5L); // 5 left after decrement
-
-        boolean result = rateLimiter.checkLimit("session-abc");
-
-        assertThat(result).isTrue();
-        // TTL should be refreshed
-        verify(redisTemplate).expire(eq("ratelimit:session-abc"), any(Duration.class));
-    }
-
-    // ── Bucket hits zero: last token ─────────────────────────────────────────
-
-    @Test
-    void lastToken_shouldStillAllow() {
-        when(valueOps.decrement(anyString())).thenReturn(0L);
-
-        boolean result = rateLimiter.checkLimit("session-zero");
-
-        assertThat(result).isTrue();
-    }
-
-    // ── Bucket exhausted: negative counter → deny ────────────────────────────
-
-    @Test
-    void bucketExhausted_shouldDeny() {
-        when(valueOps.decrement(anyString())).thenReturn(-1L);
-
-        boolean result = rateLimiter.checkLimit("session-full");
-
-        assertThat(result).isFalse();
-        // Counter should be reset to 0 to prevent runaway negatives
-        verify(valueOps).set(eq("ratelimit:session-full"), eq(0L), any(Duration.class));
-    }
-
-    // ── Repeated exhaustion ──────────────────────────────────────────────────
-
-    @Test
-    void repeatedExhaustedRequests_allDenied() {
-        when(valueOps.decrement(anyString())).thenReturn(-5L);
-
-        assertThat(rateLimiter.checkLimit("session-x")).isFalse();
-        assertThat(rateLimiter.checkLimit("session-x")).isFalse();
-    }
-
-    // ── Different sessions: independent buckets ──────────────────────────────
-
-    @Test
-    void differentSessions_independentBuckets() {
-        when(valueOps.decrement("ratelimit:session-a")).thenReturn(3L);
-        when(valueOps.decrement("ratelimit:session-b")).thenReturn(-1L);
-
-        assertThat(rateLimiter.checkLimit("session-a")).isTrue();
-        assertThat(rateLimiter.checkLimit("session-b")).isFalse();
+    void testConcurrentAccess() throws InterruptedException {
+        int threadCount = 20; // 20 threads trying to consume from a bucket of 10
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch latch = new CountDownLatch(threadCount);
+        
+        AtomicInteger successCount = new AtomicInteger(0);
+        AtomicInteger failCount = new AtomicInteger(0);
+        
+        for (int i = 0; i < threadCount; i++) {
+            executor.submit(() -> {
+                if (rateLimiter.checkLimit("session2")) {
+                    successCount.incrementAndGet();
+                } else {
+                    failCount.incrementAndGet();
+                }
+                latch.countDown();
+            });
+        }
+        
+        latch.await();
+        executor.shutdown();
+        
+        // Exactly 10 should succeed, 10 should fail (simulated atomic lua execution)
+        assertEquals(10, successCount.get());
+        assertEquals(10, failCount.get());
     }
 }

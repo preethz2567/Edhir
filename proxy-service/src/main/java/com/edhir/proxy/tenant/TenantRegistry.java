@@ -2,9 +2,13 @@ package com.edhir.proxy.tenant;
 
 import com.edhir.proxy.entity.TenantEntity;
 import com.edhir.proxy.repository.TenantRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,6 +20,9 @@ import java.util.UUID;
 public class TenantRegistry {
 
     private final TenantRepository tenantRepository;
+    
+    @Value("${edhir.security.pepper}")
+    private String pepper;
 
     public TenantRegistry(TenantRepository tenantRepository) {
         this.tenantRepository = tenantRepository;
@@ -31,14 +38,19 @@ public class TenantRegistry {
      */
     @Transactional
     public String registerTenant(String appName, String contactEmail, String integrationMode) {
+        String rawApiKey = UUID.randomUUID().toString();
+        
         TenantEntity tenant = new TenantEntity();
         tenant.setAppName(appName);
         tenant.setContactEmail(contactEmail);
         tenant.setIntegrationMode(integrationMode);
-        tenant.setApiKey(UUID.randomUUID().toString());
+        tenant.setApiKey(hashApiKey(rawApiKey));
         tenant.setActive(true);
+        tenant.setFailOpen(true);
         tenantRepository.save(tenant);
-        return tenant.getApiKey();
+        
+        // Return raw key so it can be shown to the user once
+        return rawApiKey;
     }
 
     /**
@@ -49,7 +61,7 @@ public class TenantRegistry {
      */
     public boolean validateApiKey(String apiKey) {
         if (apiKey == null || apiKey.isBlank()) return false;
-        return tenantRepository.existsByApiKeyAndIsActiveTrue(apiKey);
+        return tenantRepository.existsByApiKeyAndIsActiveTrue(hashApiKey(apiKey));
     }
 
     /**
@@ -64,6 +76,26 @@ public class TenantRegistry {
      * obtain the tenantId for per-request scoped rule loading.
      */
     public Optional<TenantEntity> findByApiKey(String apiKey) {
-        return tenantRepository.findByApiKey(apiKey);
+        if (apiKey == null || apiKey.isBlank()) return Optional.empty();
+        return tenantRepository.findByApiKey(hashApiKey(apiKey));
+    }
+    
+    private String hashApiKey(String rawApiKey) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            String input = rawApiKey + pepper;
+            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder(2 * hash.length);
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) {
+                    hexString.append('0');
+                }
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 algorithm not available", e);
+        }
     }
 }
