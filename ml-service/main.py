@@ -108,25 +108,54 @@ def update_session_score(session_id: str, score: float, conn) -> None:
 
 # ── RabbitMQ consumer (runs in a background thread) ───────────────────────────
 
+# In-memory store for tracking delivery attempts of transient failures
+# Maps delivery_tag to attempt count
+retry_cache = {}
+
 def on_message(ch, method, properties, body):
     try:
-        data = json.loads(body)
+        try:
+            data = json.loads(body)
+        except json.JSONDecodeError as e:
+            print(f"[ml-service] Malformed JSON, routing to DLQ: {e}")
+            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+            return
+
         session_id = data.get("sessionId")
         if not session_id:
-            ch.basic_ack(delivery_tag=method.delivery_tag)
+            print("[ml-service] Missing sessionId, routing to DLQ")
+            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
             return
 
         conn = get_db_conn()
         try:
             score = compute_score(str(session_id), conn)
             update_session_score(str(session_id), score, conn)
+            
+            # Success
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+            retry_cache.pop(method.delivery_tag, None)
+            
         finally:
             conn.close()
 
+    except psycopg2.Error as e:
+        # Transient DB error, we should retry up to 3 times
+        attempts = retry_cache.get(method.delivery_tag, 0) + 1
+        if attempts >= 3:
+            print(f"[ml-service] DB error, max retries reached, routing to DLQ: {e}")
+            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+            retry_cache.pop(method.delivery_tag, None)
+        else:
+            print(f"[ml-service] DB error, transient retry {attempts}/3: {e}")
+            retry_cache[method.delivery_tag] = attempts
+            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+            
     except Exception as e:
-        print(f"[ml-service] Error processing message: {e}")
-    finally:
-        ch.basic_ack(delivery_tag=method.delivery_tag)
+        # Non-recoverable error
+        print(f"[ml-service] Non-recoverable error, routing to DLQ: {e}")
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+        retry_cache.pop(method.delivery_tag, None)
 
 
 def start_consumer():
@@ -137,13 +166,23 @@ def start_consumer():
                 pika.ConnectionParameters(host=RABBIT_HOST, port=RABBIT_PORT)
             )
             channel = connection.channel()
-            channel.queue_declare(queue=QUEUE_NAME, durable=True)
+            channel.queue_declare(
+                queue=QUEUE_NAME, 
+                durable=True,
+                arguments={
+                    'x-dead-letter-exchange': 'request.metadata.dlx',
+                    'x-dead-letter-routing-key': 'request.metadata.dlq'
+                }
+            )
             channel.basic_qos(prefetch_count=1)
             channel.basic_consume(queue=QUEUE_NAME, on_message_callback=on_message)
             print(f"[ml-service] Consumer started on queue '{QUEUE_NAME}'")
             channel.start_consuming()
+        except pika.exceptions.AMQPConnectionError as e:
+            print(f"[ml-service] RabbitMQ connection error, retrying in 5s: {e}")
+            time.sleep(5)
         except Exception as e:
-            print(f"[ml-service] Consumer error, retrying in 5s: {e}")
+            print(f"[ml-service] Unexpected consumer error, retrying in 5s: {e}")
             time.sleep(5)
 
 
