@@ -1,5 +1,7 @@
 # Edhir
 
+[![CI](https://github.com/preethz2567/Edhir/actions/workflows/ci.yml/badge.svg)](https://github.com/preethz2567/Edhir/actions/workflows/ci.yml)
+
 Edhir is a production-grade Security Proxy and Threat Detection Platform.
 
 ## Architecture
