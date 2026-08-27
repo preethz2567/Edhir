@@ -35,6 +35,7 @@ spring:
     publisher-confirm-type: correlated
     publisher-returns: true
     template:
+      observation-enabled: true
       retry:
         enabled: true
         initial-interval: 1000ms
@@ -45,7 +46,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,prometheus,metrics
   endpoint:
     health:
       show-details: always

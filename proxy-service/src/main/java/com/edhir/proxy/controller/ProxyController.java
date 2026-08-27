@@ -12,6 +12,8 @@ import com.edhir.proxy.repository.SessionRepository;
 import com.edhir.proxy.tenant.TenantRegistry;
 import com.edhir.proxy.adaptive.AdaptiveController;
 import com.edhir.proxy.router.HoneypotRouter;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -52,6 +54,7 @@ public class ProxyController {
     private final AdaptiveController adaptiveController;
     private final HoneypotRouter honeypotRouter;
     private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
+    private final MeterRegistry meterRegistry;
     private final RestTemplate restTemplate = new RestTemplate();
 
     @Value("${edhir.demo-app-url}")
@@ -66,7 +69,8 @@ public class ProxyController {
                            CircuitBreakerFactory circuitBreakerFactory,
                            AdaptiveController adaptiveController,
                            HoneypotRouter honeypotRouter,
-                           org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate) {
+                           org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate,
+                           MeterRegistry meterRegistry) {
         this.tenantRegistry = tenantRegistry;
         this.rateLimiter = rateLimiter;
         this.ruleEngine = ruleEngine;
@@ -77,6 +81,7 @@ public class ProxyController {
         this.adaptiveController = adaptiveController;
         this.honeypotRouter = honeypotRouter;
         this.messagingTemplate = messagingTemplate;
+        this.meterRegistry = meterRegistry;
     }
 
     @RequestMapping("/**")
@@ -294,6 +299,21 @@ public class ProxyController {
         
         // Structured log output (handled by Logstash encoder based on MDC context)
         logger.info("Request processed");
+
+        // Record metrics
+        Counter.builder("edhir.requests")
+                .tag("verdict", verdict)
+                .tag("tenantId", session.getTenantId())
+                .register(meterRegistry)
+                .increment();
+
+        if (matchedRuleId != null) {
+            Counter.builder("edhir.rule.matches")
+                    .tag("ruleId", matchedRuleId)
+                    .tag("tenantId", session.getTenantId())
+                    .register(meterRegistry)
+                    .increment();
+        }
 
         try {
             RequestEntity req = new RequestEntity();
