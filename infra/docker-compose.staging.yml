@@ -14,14 +14,44 @@ services:
 
   ml-service:
     build: ../ml-service
-    # Port removed for staging, assuming internal routing
     expose:
       - "8000"
+
+  nginx-ml:
+    image: nginx:alpine
+    ports:
+      - "8443:443"
+    volumes:
+      - ./nginx/ml-service.conf:/etc/nginx/conf.d/default.conf:ro
+      - certs:/etc/nginx/certs:ro
+    depends_on:
+      cert-generator:
+        condition: service_completed_successfully
 
   demo-app:
     build: ../demo-app
     expose:
       - "5000"
+
+  nginx-demo:
+    image: nginx:alpine
+    ports:
+      - "9443:443"
+    volumes:
+      - ./nginx/demo-app.conf:/etc/nginx/conf.d/default.conf:ro
+      - certs:/etc/nginx/certs:ro
+    depends_on:
+      cert-generator:
+        condition: service_completed_successfully
+
+  cert-generator:
+    image: alpine/openssl
+    command: >
+      sh -c "if [ ! -f /certs/cert.pem ]; then
+        openssl req -newkey rsa:2048 -nodes -keyout /certs/key.pem -x509 -days 365 -out /certs/cert.pem -subj '/CN=localhost';
+      fi"
+    volumes:
+      - certs:/certs
 
   dashboard:
     build: ../dashboard
@@ -51,3 +81,4 @@ services:
 
 volumes:
   postgres_data:
+  certs:

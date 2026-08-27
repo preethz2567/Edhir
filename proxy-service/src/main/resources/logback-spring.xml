@@ -12,6 +12,11 @@
                 <version>[ignore]</version>
                 <levelValue>[ignore]</levelValue>
             </fieldNames>
+            <jsonGeneratorDecorator class="net.logstash.logback.mask.MaskingJsonGeneratorDecorator">
+                <valueMasker class="net.logstash.logback.mask.ValueMasker">
+                    <pattern>(?i)(api_key|apikey|x-api-key|authorization|cookie|session)[=\s]*([^\s,;]+)</pattern>
+                </valueMasker>
+            </jsonGeneratorDecorator>
         </encoder>
     </appender>
 

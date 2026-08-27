@@ -61,7 +61,46 @@ public class TenantRegistry {
      */
     public boolean validateApiKey(String apiKey) {
         if (apiKey == null || apiKey.isBlank()) return false;
-        return tenantRepository.existsByApiKeyAndIsActiveTrue(hashApiKey(apiKey));
+        String hashed = hashApiKey(apiKey);
+        Optional<TenantEntity> tenantOpt = tenantRepository.findByApiKey(hashed);
+        if (tenantOpt.isPresent() && tenantOpt.get().isActive()) return true;
+
+        return tenantRepository.findAll().stream()
+                .filter(TenantEntity::isActive)
+                .anyMatch(t -> hashed.equals(t.getSecondaryApiKey()) 
+                        && t.getSecondaryKeyExpiresAt() != null 
+                        && t.getSecondaryKeyExpiresAt().isAfter(java.time.LocalDateTime.now()));
+    }
+
+    public Optional<TenantEntity> findByApiKey(String apiKey) {
+        if (apiKey == null || apiKey.isBlank()) return Optional.empty();
+        String hashed = hashApiKey(apiKey);
+        Optional<TenantEntity> tenantOpt = tenantRepository.findByApiKey(hashed);
+        if (tenantOpt.isPresent()) return tenantOpt;
+        
+        return tenantRepository.findAll().stream()
+                .filter(t -> hashed.equals(t.getSecondaryApiKey()) 
+                        && t.getSecondaryKeyExpiresAt() != null 
+                        && t.getSecondaryKeyExpiresAt().isAfter(java.time.LocalDateTime.now()))
+                .findFirst();
+    }
+
+    @Transactional
+    public String rotateApiKey(UUID tenantId, int gracePeriodHours) {
+        TenantEntity tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("Tenant not found"));
+
+        String newRawKey = UUID.randomUUID().toString();
+        
+        // Move current to secondary with expiration
+        tenant.setSecondaryApiKey(tenant.getApiKey());
+        tenant.setSecondaryKeyExpiresAt(java.time.LocalDateTime.now().plusHours(gracePeriodHours));
+        
+        // Set new primary key
+        tenant.setApiKey(hashApiKey(newRawKey));
+        tenantRepository.save(tenant);
+        
+        return newRawKey;
     }
 
     /**
@@ -71,14 +110,7 @@ public class TenantRegistry {
         return tenantRepository.findById(id);
     }
 
-    /**
-     * Looks up the full TenantEntity by API key. Used by the proxy to
-     * obtain the tenantId for per-request scoped rule loading.
-     */
-    public Optional<TenantEntity> findByApiKey(String apiKey) {
-        if (apiKey == null || apiKey.isBlank()) return Optional.empty();
-        return tenantRepository.findByApiKey(hashApiKey(apiKey));
-    }
+
     
     private String hashApiKey(String rawApiKey) {
         try {

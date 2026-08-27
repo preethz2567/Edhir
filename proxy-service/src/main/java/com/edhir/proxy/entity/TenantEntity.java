@@ -39,6 +39,12 @@ public class TenantEntity {
     @Column(name = "adaptive_sensitivity", nullable = false)
     private float adaptiveSensitivity = 5.0f;
 
+    @Column(name = "secondary_api_key", length = 255)
+    private String secondaryApiKey;
+
+    @Column(name = "secondary_key_expires_at")
+    private LocalDateTime secondaryKeyExpiresAt;
+
     @PrePersist
     public void prePersist() {
         if (id == null) id = UUID.randomUUID();
@@ -75,4 +81,10 @@ public class TenantEntity {
 
     public float getAdaptiveSensitivity() { return adaptiveSensitivity; }
     public void setAdaptiveSensitivity(float adaptiveSensitivity) { this.adaptiveSensitivity = adaptiveSensitivity; }
+
+    public String getSecondaryApiKey() { return secondaryApiKey; }
+    public void setSecondaryApiKey(String secondaryApiKey) { this.secondaryApiKey = secondaryApiKey; }
+
+    public LocalDateTime getSecondaryKeyExpiresAt() { return secondaryKeyExpiresAt; }
+    public void setSecondaryKeyExpiresAt(LocalDateTime secondaryKeyExpiresAt) { this.secondaryKeyExpiresAt = secondaryKeyExpiresAt; }
 }

@@ -43,6 +43,16 @@ public class TenantController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PostMapping("/{id}/rotate-key")
+    public ResponseEntity<String> rotateKey(@PathVariable UUID id, @RequestParam(defaultValue = "24") int gracePeriodHours) {
+        try {
+            String newKey = tenantRegistry.rotateApiKey(id, gracePeriodHours);
+            return ResponseEntity.ok(newKey);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     public static class TenantRequest {
         private String appName;
         private String contactEmail;
