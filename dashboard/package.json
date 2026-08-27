@@ -36,7 +36,7 @@
     "vitest": "^0.34.1",
     "eslint": "^8.45.0",
     "eslint-plugin-react": "^7.32.2",
-    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.67.0",
     "@typescript-eslint/parser": "^6.0.0"
   }
 }
