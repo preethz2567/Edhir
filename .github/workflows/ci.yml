@@ -26,6 +26,11 @@ jobs:
         run: sleep 15
           
       - name: Build with Maven
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/edhir
+          SPRING_DATA_REDIS_HOST: localhost
+          SPRING_RABBITMQ_HOST: localhost
+          EDHIR_DEMO_APP_URL: http://localhost:5000
         run: mvn -B clean test checkstyle:check --file proxy-service/pom.xml
         
       - name: Stop Services
@@ -42,6 +47,12 @@ jobs:
         with:
           python-version: '3.9'
           
+      - name: Start Integration Services
+        run: docker-compose -f infra/docker-compose.ci.yml up -d
+        
+      - name: Wait for services
+        run: sleep 15
+          
       - name: Install dependencies
         run: |
           cd ml-service
@@ -54,6 +65,9 @@ jobs:
           flake8 .
           
       - name: Test with pytest
+        env:
+          POSTGRES_HOST: localhost
+          RABBITMQ_HOST: localhost
         run: |
           cd ml-service
           pytest

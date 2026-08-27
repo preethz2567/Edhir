@@ -1,0 +1,8 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/${POSTGRES_DB:edhir}
+  data:
+    redis:
+      host: localhost
+  rabbitmq:
+    host: localhost
