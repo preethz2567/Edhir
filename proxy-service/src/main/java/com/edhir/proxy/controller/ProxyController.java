@@ -51,6 +51,7 @@ public class ProxyController {
     private final CircuitBreakerFactory circuitBreakerFactory;
     private final AdaptiveController adaptiveController;
     private final HoneypotRouter honeypotRouter;
+    private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
     private final RestTemplate restTemplate = new RestTemplate();
 
     @Value("${edhir.demo-app-url}")
@@ -64,7 +65,8 @@ public class ProxyController {
                            RequestMetadataPublisher publisher,
                            CircuitBreakerFactory circuitBreakerFactory,
                            AdaptiveController adaptiveController,
-                           HoneypotRouter honeypotRouter) {
+                           HoneypotRouter honeypotRouter,
+                           org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate) {
         this.tenantRegistry = tenantRegistry;
         this.rateLimiter = rateLimiter;
         this.ruleEngine = ruleEngine;
@@ -74,6 +76,7 @@ public class ProxyController {
         this.circuitBreakerFactory = circuitBreakerFactory;
         this.adaptiveController = adaptiveController;
         this.honeypotRouter = honeypotRouter;
+        this.messagingTemplate = messagingTemplate;
     }
 
     @RequestMapping("/**")
@@ -302,6 +305,20 @@ public class ProxyController {
             req.setResponseTimeMs(responseMs);
             requestRepository.save(req);
             publisher.publish(req);
+            
+            // Broadcast to WebSocket for the specific tenant
+            Map<String, Object> wsPayload = new java.util.HashMap<>();
+            wsPayload.put("id", req.getId());
+            wsPayload.put("sessionId", req.getSessionId());
+            wsPayload.put("timestamp", req.getTimestamp());
+            wsPayload.put("path", req.getPath());
+            wsPayload.put("method", req.getMethod());
+            wsPayload.put("verdict", req.getVerdict());
+            wsPayload.put("responseTimeMs", req.getResponseTimeMs());
+            wsPayload.put("matchedRuleId", req.getMatchedRuleId());
+            
+            messagingTemplate.convertAndSend("/topic/feed/" + session.getTenantId(), wsPayload);
+            
         } catch (Exception e) {
             logger.error("Failed to persist request record: {}", e.getMessage());
         }
