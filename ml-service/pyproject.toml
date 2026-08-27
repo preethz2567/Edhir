@@ -1,0 +1,27 @@
+[project]
+name = "ml-service"
+version = "0.1.0"
+description = "Edhir ML Service for Anomaly Detection"
+requires-python = ">=3.9"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "scikit-learn",
+    "pydantic",
+    "pika",
+    "psycopg2-binary",
+    "joblib",
+    "python-json-logger",
+    "pandas",
+    "scipy",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "httpx"
+]
