@@ -10,6 +10,8 @@ import com.edhir.proxy.ratelimit.RateLimiter;
 import com.edhir.proxy.repository.RequestRepository;
 import com.edhir.proxy.repository.SessionRepository;
 import com.edhir.proxy.tenant.TenantRegistry;
+import com.edhir.proxy.adaptive.AdaptiveController;
+import com.edhir.proxy.router.HoneypotRouter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -47,6 +49,8 @@ public class ProxyController {
     private final RequestRepository requestRepository;
     private final RequestMetadataPublisher publisher;
     private final CircuitBreakerFactory circuitBreakerFactory;
+    private final AdaptiveController adaptiveController;
+    private final HoneypotRouter honeypotRouter;
     private final RestTemplate restTemplate = new RestTemplate();
 
     @Value("${edhir.demo-app-url}")
@@ -58,7 +62,9 @@ public class ProxyController {
                            SessionRepository sessionRepository,
                            RequestRepository requestRepository,
                            RequestMetadataPublisher publisher,
-                           CircuitBreakerFactory circuitBreakerFactory) {
+                           CircuitBreakerFactory circuitBreakerFactory,
+                           AdaptiveController adaptiveController,
+                           HoneypotRouter honeypotRouter) {
         this.tenantRegistry = tenantRegistry;
         this.rateLimiter = rateLimiter;
         this.ruleEngine = ruleEngine;
@@ -66,6 +72,8 @@ public class ProxyController {
         this.requestRepository = requestRepository;
         this.publisher = publisher;
         this.circuitBreakerFactory = circuitBreakerFactory;
+        this.adaptiveController = adaptiveController;
+        this.honeypotRouter = honeypotRouter;
     }
 
     @RequestMapping("/**")
@@ -146,6 +154,31 @@ public class ProxyController {
                 persistAndPublish(session, httpRequest, verdict.getMatchedRuleId(), "block", startMs);
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                         .body("Edhir: request blocked by rule " + verdict.getMatchedRuleId());
+            }
+
+            // Step 4.5: Adaptive Detection and Honeypot Routing
+            float currentScore = session.getCurrentScore();
+            boolean isTrending = adaptiveController.detectTrend(session.getId().toString(), currentScore, tenant.getAdaptiveSensitivity());
+            float newThreshold = adaptiveController.getAdjustedThreshold(session.getId().toString(), currentScore, 80.0f, tenant.getAdaptiveFloor(), isTrending);
+            
+            // Update session threshold if changed
+            if (session.getCurrentThreshold() != newThreshold) {
+                session.setCurrentThreshold(newThreshold);
+                sessionRepository.save(session);
+            }
+
+            if (currentScore >= newThreshold) {
+                boolean redirect = honeypotRouter.shouldRedirect(currentScore, newThreshold);
+                if (redirect) {
+                    persistAndPublish(session, httpRequest, null, "honeypot", startMs);
+                    return ResponseEntity.status(HttpStatus.FOUND)
+                            .header(HttpHeaders.LOCATION, "/honeypot-sinkhole")
+                            .build();
+                } else {
+                    persistAndPublish(session, httpRequest, null, "block", startMs);
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                            .body("Edhir: request blocked by adaptive score threshold");
+                }
             }
 
             // Step 5: Forward request to demo-app using Resilience4j

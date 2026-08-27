@@ -33,6 +33,12 @@ public class TenantEntity {
     @Column(name = "fail_open", nullable = false)
     private boolean failOpen = true;
 
+    @Column(name = "adaptive_floor", nullable = false)
+    private float adaptiveFloor = 50.0f;
+
+    @Column(name = "adaptive_sensitivity", nullable = false)
+    private float adaptiveSensitivity = 5.0f;
+
     @PrePersist
     public void prePersist() {
         if (id == null) id = UUID.randomUUID();
@@ -63,4 +69,10 @@ public class TenantEntity {
 
     public boolean isFailOpen() { return failOpen; }
     public void setFailOpen(boolean failOpen) { this.failOpen = failOpen; }
+
+    public float getAdaptiveFloor() { return adaptiveFloor; }
+    public void setAdaptiveFloor(float adaptiveFloor) { this.adaptiveFloor = adaptiveFloor; }
+
+    public float getAdaptiveSensitivity() { return adaptiveSensitivity; }
+    public void setAdaptiveSensitivity(float adaptiveSensitivity) { this.adaptiveSensitivity = adaptiveSensitivity; }
 }

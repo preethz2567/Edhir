@@ -1,0 +1,2 @@
+ALTER TABLE tenants ADD COLUMN adaptive_floor FLOAT NOT NULL DEFAULT 50.0;
+ALTER TABLE tenants ADD COLUMN adaptive_sensitivity FLOAT NOT NULL DEFAULT 5.0;
