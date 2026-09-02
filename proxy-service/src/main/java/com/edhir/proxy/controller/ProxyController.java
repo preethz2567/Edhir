@@ -303,14 +303,14 @@ public class ProxyController {
         // Record metrics
         Counter.builder("edhir.requests")
                 .tag("verdict", verdict)
-                .tag("tenantId", session.getTenantId())
+                .tag("tenantId", session.getTenantId().toString())
                 .register(meterRegistry)
                 .increment();
 
         if (matchedRuleId != null) {
             Counter.builder("edhir.rule.matches")
-                    .tag("ruleId", matchedRuleId)
-                    .tag("tenantId", session.getTenantId())
+                    .tag("ruleId", matchedRuleId.toString())
+                    .tag("tenantId", session.getTenantId().toString())
                     .register(meterRegistry)
                     .increment();
         }
@@ -327,7 +327,7 @@ public class ProxyController {
             publisher.publish(req);
             
             // Broadcast to WebSocket for the specific tenant
-            Map<String, Object> wsPayload = new java.util.HashMap<>();
+            java.util.Map<String, Object> wsPayload = new java.util.HashMap<>();
             wsPayload.put("id", req.getId());
             wsPayload.put("sessionId", req.getSessionId());
             wsPayload.put("timestamp", req.getTimestamp());
@@ -336,9 +336,7 @@ public class ProxyController {
             wsPayload.put("verdict", req.getVerdict());
             wsPayload.put("responseTimeMs", req.getResponseTimeMs());
             wsPayload.put("matchedRuleId", req.getMatchedRuleId());
-            
-            messagingTemplate.convertAndSend("/topic/feed/" + session.getTenantId(), wsPayload);
-            
+            messagingTemplate.convertAndSend("/topic/feed/" + session.getTenantId(), (Object) wsPayload);
         } catch (Exception e) {
             logger.error("Failed to persist request record: {}", e.getMessage());
         }
