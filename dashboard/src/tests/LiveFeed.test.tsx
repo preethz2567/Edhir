@@ -5,11 +5,11 @@ import { LiveFeed } from '../components/LiveFeed';
 // Mock STOMP client as it uses WebSocket which isn't available in jsdom natively without setup
 vi.mock('@stomp/stompjs', () => {
   return {
-    Client: vi.fn().mockImplementation(() => ({
-      activate: vi.fn(),
-      deactivate: vi.fn(),
-      subscribe: vi.fn(),
-    })),
+    Client: class {
+      activate = vi.fn();
+      deactivate = vi.fn();
+      subscribe = vi.fn();
+    }
   };
 });
 

@@ -26,7 +26,7 @@ def test_campaign_correlation(mock_extract, mock_get_conn):
         elif sid == "uuid-2":
             return {"inter_request_timing_variance": 0.11, "request_velocity": 10, "path_entropy": 0.5, "session_duration": 101, "header_consistency": 1.0}
         elif sid == "uuid-3":
-            return {"inter_request_timing_variance": 5.0, "request_velocity": 2, "path_entropy": 2.0, "session_duration": 500, "header_consistency": 0.5}
+            return {"inter_request_timing_variance": 5.0, "request_velocity": 1000, "path_entropy": 2.0, "session_duration": 1, "header_consistency": 0.5}
         elif sid == "uuid-4":
             return {"inter_request_timing_variance": 0.0, "request_velocity": 0, "path_entropy": 0.0, "session_duration": 0, "header_consistency": 1.0}
             
