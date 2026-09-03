@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 
 interface LoginProps {
   onSuccess: (tenantId: string) => void;
+  onNavigateToSignup: () => void;
 }
 
-export function Login({ onSuccess }: LoginProps) {
+export function Login({ onSuccess, onNavigateToSignup }: LoginProps) {
   const [apiKey, setApiKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,28 +39,26 @@ export function Login({ onSuccess }: LoginProps) {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f0f16] flex items-center justify-center p-4">
-      <div className="bg-[#1e1e2d] border border-gray-800 p-8 rounded-xl w-full max-w-md shadow-2xl">
-        <h1 className="text-3xl font-bold text-white mb-2 text-center">Edhir</h1>
-        <p className="text-gray-400 text-center mb-8">Adaptive WAF Dashboard</p>
+    <div className="app-center-wrapper">
+      <div className="solid-card login-card">
+        <h1 className="text-3xl text-center mb-2 dashboard-title">Edhir</h1>
+        <p className="text-center mb-8 dashboard-subtitle">Adaptive WAF Dashboard</p>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Tenant API Key
-            </label>
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label>Tenant API Key</label>
             <input
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              className="w-full bg-[#151521] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+              className="form-input"
               placeholder="Enter your API key"
               required
             />
           </div>
 
           {error && (
-            <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg text-red-200 text-sm">
+            <div className="alert-error">
               {error}
             </div>
           )}
@@ -67,9 +66,17 @@ export function Login({ onSuccess }: LoginProps) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn btn-primary mb-2"
           >
             {loading ? 'Authenticating...' : 'Sign In'}
+          </button>
+          
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onNavigateToSignup}
+          >
+            Create new tenant
           </button>
         </form>
       </div>
