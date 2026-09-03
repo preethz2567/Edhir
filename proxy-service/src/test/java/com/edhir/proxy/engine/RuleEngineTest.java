@@ -52,36 +52,36 @@ class RuleEngineTest {
     @Test
     void testSqlInjection() {
         // Blocked
-        assertTrue(ruleEngine.evaluate("/login", "user=admin' OR 1=1--", tenantId).isBlock());
-        assertTrue(ruleEngine.evaluate("/search", "q=UNION SELECT * FROM users", tenantId).isBlock());
-        assertTrue(ruleEngine.evaluate("/api", "q=DROP TABLE students;", tenantId).isBlock());
-        assertTrue(ruleEngine.evaluate("/api", "q=pg_sleep(10)", tenantId).isBlock());
+        assertTrue(ruleEngine.evaluate("/login", "user=admin' OR 1=1--", null, tenantId).isBlock());
+        assertTrue(ruleEngine.evaluate("/search", "q=UNION SELECT * FROM users", null, tenantId).isBlock());
+        assertTrue(ruleEngine.evaluate("/api", "q=DROP TABLE students;", null, tenantId).isBlock());
+        assertTrue(ruleEngine.evaluate("/api", "q=pg_sleep(10)", null, tenantId).isBlock());
 
         // Allowed
-        assertFalse(ruleEngine.evaluate("/login", "user=admin", tenantId).isBlock());
-        assertFalse(ruleEngine.evaluate("/search", "q=union square", tenantId).isBlock());
+        assertFalse(ruleEngine.evaluate("/login", "user=admin", null, tenantId).isBlock());
+        assertFalse(ruleEngine.evaluate("/search", "q=union square", null, tenantId).isBlock());
     }
 
     @Test
     void testXss() {
         // Blocked
-        assertTrue(ruleEngine.evaluate("/post", "comment=<script>alert(1)</script>", tenantId).isBlock());
-        assertTrue(ruleEngine.evaluate("/post", "comment=<img src=x onerror=alert(1)>", tenantId).isBlock());
-        assertTrue(ruleEngine.evaluate("/redirect", "url=javascript:alert(1)", tenantId).isBlock());
+        assertTrue(ruleEngine.evaluate("/post", "comment=<script>alert(1)</script>", null, tenantId).isBlock());
+        assertTrue(ruleEngine.evaluate("/post", "comment=<img src=x onerror=alert(1)>", null, tenantId).isBlock());
+        assertTrue(ruleEngine.evaluate("/redirect", "url=javascript:alert(1)", null, tenantId).isBlock());
 
         // Allowed
-        assertFalse(ruleEngine.evaluate("/post", "comment=hello there", tenantId).isBlock());
-        assertFalse(ruleEngine.evaluate("/post", "comment=<p>Hello</p>", tenantId).isBlock());
+        assertFalse(ruleEngine.evaluate("/post", "comment=hello there", null, tenantId).isBlock());
+        assertFalse(ruleEngine.evaluate("/post", "comment=<p>Hello</p>", null, tenantId).isBlock());
     }
 
     @Test
     void testPathTraversal() {
         // Blocked
-        assertTrue(ruleEngine.evaluate("/files/../../etc/passwd", null, tenantId).isBlock());
-        assertTrue(ruleEngine.evaluate("/files/%2e%2e%2fetc%2fpasswd", null, tenantId).isBlock());
+        assertTrue(ruleEngine.evaluate("/files/../../etc/passwd", null, null, tenantId).isBlock());
+        assertTrue(ruleEngine.evaluate("/files/%2e%2e%2fetc%2fpasswd", null, null, tenantId).isBlock());
 
         // Allowed
-        assertFalse(ruleEngine.evaluate("/files/images/photo.jpg", null, tenantId).isBlock());
-        assertFalse(ruleEngine.evaluate("/files/profile.png", null, tenantId).isBlock());
+        assertFalse(ruleEngine.evaluate("/files/images/photo.jpg", null, null, tenantId).isBlock());
+        assertFalse(ruleEngine.evaluate("/files/profile.png", null, null, tenantId).isBlock());
     }
 }
