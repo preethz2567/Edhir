@@ -81,7 +81,6 @@ public class ProxyController {
         this.adaptiveController = adaptiveController;
         this.honeypotRouter = honeypotRouter;
         this.messagingTemplate = messagingTemplate;
-        this.messagingTemplate = messagingTemplate;
         this.meterRegistry = meterRegistry;
         
         this.restTemplate = new RestTemplate();
