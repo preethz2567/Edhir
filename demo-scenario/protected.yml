@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  target-demo-app:
+    build: ../demo-app
+    # Intentionally no exposed ports, reachable only via sidecar
+
+  sidecar:
+    build: ../proxy-service
+    ports:
+      - "8443:8080"
+    environment:
+      - EDHIR_DEMO_APP_URL=http://target-demo-app:5000
+      - POSTGRES_USER=${POSTGRES_USER:-admin}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-admin_password}
+      - POSTGRES_DB=${POSTGRES_DB:-edhir}
+    depends_on:
+      - target-demo-app
+
+networks:
+  default:
+    name: infra_default
+    external: true
