@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { StatCards } from '../components/StatCards';
-import { LiveFeed, RequestRecord } from '../components/LiveFeed';
-import { ErrorBoundary } from '../components/ErrorBoundary';
+import { Outlet, useOutletContext } from 'react-router-dom';
+import { Sidebar } from '../components/Sidebar';
 import { Loader2, Copy, Check } from 'lucide-react';
+import { WebSocketProvider } from '../context/WebSocketContext';
+import { RequestRecord } from '../components/LiveFeed';
 
-interface DashboardResponse {
+export interface DashboardResponse {
   requests: RequestRecord[];
   summary: {
     total: number;
@@ -14,17 +15,22 @@ interface DashboardResponse {
   };
 }
 
-interface DashboardProps {
+export interface DashboardContextType {
+  dashboardData?: DashboardResponse;
+  isLoading: boolean;
+  isError: boolean;
   tenantId: string;
-  onLogout: () => void;
 }
 
-export function Dashboard({ tenantId, onLogout }: DashboardProps) {
+export function useDashboardContext() {
+  return useOutletContext<DashboardContextType>();
+}
+
+export function DashboardLayout({ tenantId, onLogout }: { tenantId: string, onLogout: () => void }) {
   const { data, isLoading, isError } = useQuery<DashboardResponse>({
     queryKey: ['dashboard', tenantId],
     queryFn: async () => {
-      const res = await fetch('/api/dashboard/live', {
-      });
+      const res = await fetch('/api/dashboard/live');
       if (!res.ok) {
         if (res.status === 401) onLogout();
         throw new Error('Failed to fetch data');
@@ -41,33 +47,19 @@ export function Dashboard({ tenantId, onLogout }: DashboardProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleLogout = async () => {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-    } finally {
-      onLogout();
-    }
-  };
-
   const isWaiting = !isLoading && !isError && data?.summary.total === 0;
 
-  return (
-    <div className="content-wrapper">
-      <div className="content-inner">
-        <div className="dashboard-header">
-          <div>
-            <h1 className="dashboard-title">Security Overview</h1>
-            <p className="dashboard-subtitle">Tenant ID: {tenantId}</p>
+  if (isWaiting) {
+    return (
+      <div className="content-wrapper">
+        <div className="content-inner">
+          <div className="dashboard-header">
+            <div>
+              <h1 className="dashboard-title">Security Overview</h1>
+              <p className="dashboard-subtitle">Tenant ID: {tenantId}</p>
+            </div>
+            <button onClick={onLogout} className="btn btn-secondary btn-sm">Sign Out</button>
           </div>
-          <button 
-            onClick={handleLogout}
-            className="btn btn-secondary btn-sm"
-          >
-            Sign Out
-          </button>
-        </div>
-
-        {isWaiting ? (
           <div className="solid-card text-center" style={{ padding: '4rem 2rem' }}>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
               <div style={{ animation: 'spin 2s linear infinite' }}>
@@ -95,29 +87,19 @@ export function Dashboard({ tenantId, onLogout }: DashboardProps) {
               </div>
             </div>
           </div>
-        ) : (
-          <>
-            <ErrorBoundary>
-              <StatCards 
-                isLoading={isLoading}
-                isError={isError}
-                total={data?.summary.total || 0}
-                allowed={data?.summary.allowed || 0}
-                blocked={data?.summary.blocked || 0}
-                honeypot={0} 
-              />
-            </ErrorBoundary>
-
-            <ErrorBoundary>
-              <LiveFeed 
-                tenantId={tenantId}
-                initialData={data?.requests || []}
-                isLoading={isLoading}
-              />
-            </ErrorBoundary>
-          </>
-        )}
+        </div>
       </div>
-    </div>
+    );
+  }
+
+  return (
+    <WebSocketProvider tenantId={tenantId}>
+      <div className="dashboard-layout">
+        <Sidebar onLogout={onLogout} tenantId={tenantId} />
+        <div className="dashboard-main">
+          <Outlet context={{ dashboardData: data, isLoading, isError, tenantId }} />
+        </div>
+      </div>
+    </WebSocketProvider>
   );
 }

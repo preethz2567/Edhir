@@ -3,8 +3,14 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { LandingPage } from './pages/LandingPage';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
-import { Dashboard } from './pages/Dashboard';
+import { DashboardLayout } from './pages/Dashboard';
 import { Onboarding } from './pages/Onboarding';
+import { Overview } from './pages/Overview';
+import { Traffic } from './pages/Traffic';
+import { Campaigns } from './pages/Campaigns';
+import { Rules } from './pages/Rules';
+import { Honeypot } from './pages/Honeypot';
+import { Settings } from './pages/Settings';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 function DashboardApp() {
@@ -63,7 +69,17 @@ function DashboardApp() {
 
   return (
     <ErrorBoundary>
-      <Dashboard tenantId={tenantId} onLogout={() => setTenantId(null)} />
+      <Routes>
+        <Route element={<DashboardLayout tenantId={tenantId} onLogout={() => setTenantId(null)} />}>
+          <Route path="overview" element={<Overview />} />
+          <Route path="traffic" element={<Traffic />} />
+          <Route path="campaigns" element={<Campaigns />} />
+          <Route path="rules" element={<Rules />} />
+          <Route path="honeypot" element={<Honeypot />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="*" element={<Navigate to="overview" replace />} />
+        </Route>
+      </Routes>
     </ErrorBoundary>
   );
 }
@@ -73,7 +89,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/app" element={<DashboardApp />} />
+        <Route path="/app/*" element={<DashboardApp />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
