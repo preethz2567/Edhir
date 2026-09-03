@@ -122,5 +122,13 @@ def products():
     }), 200
 
 
+@app.route("/feedback", methods=["POST"])
+def feedback():
+    """
+    POST /feedback
+    Accepts any form data (like an XSS payload) and returns 200 OK.
+    """
+    return jsonify({"status": "received", "message": "Thank you for your feedback!"}), 200
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

@@ -29,7 +29,7 @@ curl -s -i $HEADERS "$TARGET_URL/products?category=1'+UNION+SELECT+*+FROM+users-
 echo ""
 
 echo "--- [4/4] Attack: XSS in form body ---"
-echo "POST /login"
+echo "POST /feedback"
 # The Edhir proxy will block this payload with a 403 Forbidden. 
-curl -s -i -X POST $HEADERS -d "username=<script>alert('xss')</script>" "$TARGET_URL/login" | head -n 1
+curl -s -i -X POST $HEADERS -d "comment=<script>alert('xss')</script>" "$TARGET_URL/feedback" | head -n 1
 echo ""

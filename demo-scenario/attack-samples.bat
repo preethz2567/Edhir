@@ -27,6 +27,6 @@ curl -s -i %HEADERS% "%TARGET_URL%/products?category=1'+UNION+SELECT+*+FROM+user
 echo.
 
 echo --- [4/4] Attack: XSS in form body ---
-echo POST /login
-curl -s -i -X POST %HEADERS% -d "username=<script>alert('xss')</script>" "%TARGET_URL%/login" | findstr /R "^HTTP"
+echo POST /feedback
+curl -s -i -X POST %HEADERS% -d "comment=<script>alert('xss')</script>" "%TARGET_URL%/feedback" | findstr /R "^HTTP"
 echo.
