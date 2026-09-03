@@ -1,7 +1,7 @@
 #!/bin/bash
 # attack-samples.sh
 
-TARGET_URL=${1:-http://localhost:8080}
+TARGET_URL=${1:-http://localhost:8081}
 API_KEY=$2
 
 HEADERS=""

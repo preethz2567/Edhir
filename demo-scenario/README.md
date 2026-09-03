@@ -15,7 +15,7 @@ To run the automated demo, simply execute:
 ```
 
 **What the script does:**
-1. Starts the demo app standalone (`unprotected.yml`) on port 8080.
+1. Starts the demo app standalone (`unprotected.yml`) on port 8081.
 2. Fires a mix of clean and malicious requests against it, demonstrating that the malicious payloads successfully reach the application (HTTP 200).
 3. Stops the standalone app and starts the protected stack (`protected.yml`), placing the Edhir proxy on port 8443 and hiding the demo app behind it.
 4. Generates a fresh API Key.
@@ -36,7 +36,7 @@ docker compose -f unprotected.yml up -d
 
 Send an attack payload:
 ```bash
-curl -i "http://localhost:8080/products?category=1'+UNION+SELECT+*+FROM+users--"
+curl -i "http://localhost:8081/products?category=1'+UNION+SELECT+*+FROM+users--"
 ```
 Notice how the application accepts the request and returns a `200 OK`.
 

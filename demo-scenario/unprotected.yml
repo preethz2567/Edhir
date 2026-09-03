@@ -1,7 +1,5 @@
-version: '3.8'
-
 services:
   target-demo-app:
     build: ../demo-app
     ports:
-      - "8080:5000"
+      - "8081:5000"

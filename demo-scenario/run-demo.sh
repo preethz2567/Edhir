@@ -15,14 +15,14 @@ chmod +x attack-samples.sh
 echo "------------------------------------------"
 echo "Phase 1: Unprotected Application"
 echo "------------------------------------------"
-echo "Deploying demo-app natively on port 8080..."
+echo "Deploying demo-app natively on port 8081..."
 docker compose -f unprotected.yml up -d --build
 echo "Waiting for demo-app to initialize (5s)..."
 sleep 5
 echo ""
 
 echo "Executing sample traffic against the unprotected app..."
-./attack-samples.sh http://localhost:8080
+./attack-samples.sh http://localhost:8081
 echo ""
 echo "(Notice how the attack requests were accepted by the application and returned HTTP 200 OK)"
 echo ""
