@@ -36,8 +36,8 @@ docker compose -f unprotected.yml down
 echo ""
 echo "Deploying demo-app hidden behind the Edhir Sidecar proxy (port 8443)..."
 docker compose -f protected.yml up -d --build
-echo "Waiting for sidecar and app to initialize (15s)..."
-sleep 15
+echo "Waiting for sidecar and app to initialize (20s)..."
+sleep 20
 echo ""
 
 echo "Generating an API Key for the Sidecar tenant..."
