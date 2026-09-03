@@ -41,11 +41,12 @@ public class RuleEngine {
      * Evaluates the request path (and, where present, the raw body) against all
      * active rules that apply to the given tenant (tenant-specific + global).
      */
-    public Verdict evaluate(String path, String rawQuery, UUID tenantId) {
+    public Verdict evaluate(String path, String rawQuery, String body, UUID tenantId) {
         List<RuleEntry> rules = ruleCache.get(tenantId, this::loadRulesFromDb);
 
         String subject = (path == null ? "" : path)
-                + (rawQuery != null ? "?" + rawQuery : "");
+                + (rawQuery != null ? "?" + rawQuery : "")
+                + (body != null ? "\n" + body : "");
 
         if (rules != null) {
             for (RuleEntry rule : rules) {

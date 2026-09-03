@@ -21,16 +21,15 @@ public class RabbitMQConfig {
     public static final String REQUEST_METADATA_DLX = "request.metadata.dlx";
     public static final String REQUEST_METADATA_DLQ = "request.metadata.dlq";
     
-    private final RabbitAdmin rabbitAdmin;
+    private final org.springframework.amqp.rabbit.connection.ConnectionFactory connectionFactory;
 
-    public RabbitMQConfig(RabbitAdmin rabbitAdmin) {
-        this.rabbitAdmin = rabbitAdmin;
+    public RabbitMQConfig(org.springframework.amqp.rabbit.connection.ConnectionFactory connectionFactory) {
+        this.connectionFactory = connectionFactory;
     }
 
-    @PostConstruct
-    public void deleteOldQueue() {
-        // Delete the old queue if it exists to allow re-declaration with new DLX arguments
-        rabbitAdmin.deleteQueue(REQUEST_METADATA_QUEUE);
+    @Bean
+    public RabbitAdmin rabbitAdmin() {
+        return new RabbitAdmin(connectionFactory);
     }
 
     @Bean

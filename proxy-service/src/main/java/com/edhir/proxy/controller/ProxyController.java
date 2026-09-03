@@ -55,7 +55,7 @@ public class ProxyController {
     private final HoneypotRouter honeypotRouter;
     private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
     private final MeterRegistry meterRegistry;
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
 
     @Value("${edhir.demo-app-url}")
     private String demoAppUrl;
@@ -81,7 +81,16 @@ public class ProxyController {
         this.adaptiveController = adaptiveController;
         this.honeypotRouter = honeypotRouter;
         this.messagingTemplate = messagingTemplate;
+        this.messagingTemplate = messagingTemplate;
         this.meterRegistry = meterRegistry;
+        
+        this.restTemplate = new RestTemplate();
+        this.restTemplate.setErrorHandler(new org.springframework.web.client.DefaultResponseErrorHandler() {
+            @Override
+            public boolean hasError(org.springframework.http.client.ClientHttpResponse response) throws java.io.IOException {
+                return false; // Prevent RestTemplate from throwing exceptions on 4xx/5xx from demo-app
+            }
+        });
     }
 
     @RequestMapping("/**")
@@ -148,9 +157,12 @@ public class ProxyController {
 
             // Step 4: Rule engine evaluation (Fail-open aware)
             String queryString = httpRequest.getQueryString();
+            String decodedQuery = queryString != null ? java.net.URLDecoder.decode(queryString, StandardCharsets.UTF_8) : null;
+            String requestBody = readBodySafe(httpRequest);
+            
             Verdict verdict = Verdict.allow();
             try {
-                verdict = ruleEngine.evaluate(httpRequest.getRequestURI(), queryString, tenant.getId());
+                verdict = ruleEngine.evaluate(httpRequest.getRequestURI(), decodedQuery, requestBody, tenant.getId());
             } catch (Exception e) {
                 logger.warn("Rule engine failed: {}", e.getMessage());
                 if (!tenant.isFailOpen()) {
@@ -193,7 +205,6 @@ public class ProxyController {
             String targetUrl = demoAppUrl + httpRequest.getRequestURI()
                     + (queryString != null ? "?" + queryString : "");
 
-            String requestBody = readBodySafe(httpRequest);
             HttpHeaders headers = copyHeaders(httpRequest);
             HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
 

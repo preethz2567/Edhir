@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
  * DashboardController exposes read-only endpoints consumed by the React dashboard.
  */
 @RestController
-@RequestMapping("/dashboard")
+@RequestMapping("/api/dashboard")
 @CrossOrigin(origins = "*") // Allow the dashboard (port 3000) to call directly
 public class DashboardController {
 
