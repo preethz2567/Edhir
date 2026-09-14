@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { LiveFeed } from '../components/LiveFeed';
+import { WebSocketProvider } from '../context/WebSocketContext';
 
 // Mock STOMP client as it uses WebSocket which isn't available in jsdom natively without setup
 vi.mock('@stomp/stompjs', () => {
@@ -35,18 +36,26 @@ describe('LiveFeed Component', () => {
     }
   ];
 
+  const renderWithProvider = (ui: React.ReactElement) => {
+    return render(
+      <WebSocketProvider tenantId="t-1">
+        {ui}
+      </WebSocketProvider>
+    );
+  };
+
   it('renders loading state', () => {
-    render(<LiveFeed tenantId="t-1" initialData={[]} isLoading={true} />);
+    renderWithProvider(<LiveFeed tenantId="t-1" initialData={[]} isLoading={true} />);
     expect(screen.getByText('Loading historical feed...')).toBeInTheDocument();
   });
 
   it('renders empty state when no data and not loading', () => {
-    render(<LiveFeed tenantId="t-1" initialData={[]} isLoading={false} />);
+    renderWithProvider(<LiveFeed tenantId="t-1" initialData={[]} isLoading={false} />);
     expect(screen.getByText('No traffic recorded yet.')).toBeInTheDocument();
   });
 
   it('renders initial data correctly', () => {
-    render(<LiveFeed tenantId="t-1" initialData={mockInitialData} isLoading={false} />);
+    renderWithProvider(<LiveFeed tenantId="t-1" initialData={mockInitialData} isLoading={false} />);
     
     // Check paths are rendered
     expect(screen.getByText('/login')).toBeInTheDocument();

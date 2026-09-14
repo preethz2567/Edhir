@@ -36,7 +36,7 @@ export function StatCards({ isLoading, isError, total, allowed, blocked, honeypo
           </div>
           <div className="kpi-body">
             {isLoading ? (
-              <span className="kpi-value" style={{opacity: 0.5}}>...</span>
+              <div className="h-8 w-16 bg-white/10 rounded animate-pulse"></div>
             ) : (
               <span className="kpi-value">{c.value.toLocaleString()}</span>
             )}
