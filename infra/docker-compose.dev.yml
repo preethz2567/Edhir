@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   proxy-service:
-    build: ../proxy-service
+    build:
+      context: ../proxy-service
+      network: host
     ports:
       - "8080:8080"
     depends_on:
@@ -13,17 +15,23 @@ services:
       - postgres
 
   ml-service:
-    build: ../ml-service
+    build:
+      context: ../ml-service
+      network: host
     ports:
       - "8000:8000"
 
   demo-app:
-    build: ../demo-app
+    build:
+      context: ../demo-app
+      network: host
     ports:
       - "5000:5000"
 
   dashboard:
-    build: ../dashboard
+    build:
+      context: ../dashboard
+      network: host
     ports:
       - "3000:3000"
 
