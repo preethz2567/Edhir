@@ -3,7 +3,8 @@ version: '3.8'
 services:
   proxy-service:
     build:
-      context: ../proxy-service
+      context: ..
+      dockerfile: proxy-service/Dockerfile
     env_file:
       - .env
     ports:
