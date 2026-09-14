@@ -4,11 +4,14 @@ services:
     # Intentionally no exposed ports, reachable only via sidecar
 
   sidecar:
-    build: ../proxy-service
+    image: edhir/sidecar:latest
     ports:
       - "8443:8080"
     environment:
-      - EDHIR_DEMO_APP_URL=http://target-demo-app:5000
+      - TARGET_URL=http://target-demo-app:5000
+      - EDHIR_API_KEY=bad07d18-621e-441a-8ecd-f7c769294ab1
+      - POSTGRES_USER=edhir_user
+      - POSTGRES_PASSWORD=Preethi@1224
     depends_on:
       - target-demo-app
 
