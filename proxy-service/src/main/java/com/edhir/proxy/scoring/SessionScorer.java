@@ -10,7 +10,7 @@ public class SessionScorer {
 
     public void recordRequest(Request request) {
         if (request != null && request.getSessionId() != null) {
-            requestCounts.merge(request.getSessionId(), 1, Integer::sum);
+            requestCounts.merge(request.getSessionId().toString(), 1, Integer::sum);
         }
     }
 
