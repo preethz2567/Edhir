@@ -23,15 +23,18 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
+    url: jdbc:postgresql://postgres:5432/${POSTGRES_DB:edhir}
+    user: ${POSTGRES_USER:user}
+    password: ${POSTGRES_PASSWORD:password}
   data:
     redis:
-      host: redis
-      port: 6379
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
   rabbitmq:
-    host: rabbitmq
-    port: 5672
-    username: guest
-    password: guest
+    host: ${RABBITMQ_HOST:rabbitmq}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASS:guest}
     publisher-confirm-type: correlated
     publisher-returns: true
     template:
@@ -52,7 +55,7 @@ management:
       show-details: always
 
 edhir:
-  demo-app-url: http://demo-app:5000
+  demo-app-url: ${TARGET_URL:http://demo-app:5000}
   security:
     pepper: ${EDHIR_SECURITY_PEPPER:super-secret-default-pepper-12345}
 
