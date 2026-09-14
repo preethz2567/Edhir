@@ -4,12 +4,12 @@ WORKDIR /app
 # Build SDK first
 COPY edhir-java-sdk/pom.xml edhir-java-sdk/
 COPY edhir-java-sdk/src edhir-java-sdk/src
-RUN mvn -f edhir-java-sdk/pom.xml clean install -DskipTests
+RUN mvn -f edhir-java-sdk/pom.xml clean install -Dmaven.test.skip=true
 
 # Build proxy-service
 COPY proxy-service/pom.xml proxy-service/
 COPY proxy-service/src proxy-service/src
-RUN mvn -f proxy-service/pom.xml clean package -DskipTests
+RUN mvn -f proxy-service/pom.xml clean package -Dmaven.test.skip=true
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 COPY --from=build /app/proxy-service/target/proxy-service-0.0.1-SNAPSHOT.jar app.jar
