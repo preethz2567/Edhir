@@ -8,3 +8,4 @@ joblib
 pytest
 pandas
 python-json-logger
+opentelemetry-api
