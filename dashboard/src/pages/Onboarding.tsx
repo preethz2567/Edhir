@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Check, Copy, AlertTriangle } from 'lucide-react';
 
 interface OnboardingProps {
@@ -17,88 +17,95 @@ export function Onboarding({ apiKey, integrationMode, onComplete }: OnboardingPr
   };
 
   return (
-    <div className="content-wrapper">
-      <div className="content-inner" style={{ maxWidth: '800px', marginTop: '2rem' }}>
-        <div className="solid-card" style={{ marginBottom: '2rem' }}>
-          <div className="section-header-wrap">
-            <h1 className="dashboard-title text-center" style={{ marginBottom: '1rem' }}>Welcome to Edhir</h1>
-            <p className="dashboard-subtitle text-center">Your tenant has been created successfully.</p>
+    <div className="onboarding-wrapper">
+      <div className="onboarding-inner">
+        {/* Header */}
+        <div style={{ marginBottom: '2rem' }}>
+          <div style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--text-1)', marginBottom: '0.25rem' }}>
+            Edhir
           </div>
+          <h1 style={{ fontSize: '1.375rem', fontWeight: 600, color: 'var(--text-1)', letterSpacing: '-0.02em', marginBottom: '0.375rem' }}>
+            Tenant created
+          </h1>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-2)' }}>
+            Copy your API key and follow the setup instructions below.
+          </p>
+        </div>
 
-          <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--accent-red)', padding: '1rem', borderRadius: '8px', marginBottom: '2rem', display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-            <AlertTriangle color="var(--accent-red)" size={24} style={{ flexShrink: 0 }} />
-            <div>
-              <h3 style={{ color: 'var(--accent-red)', fontSize: '0.875rem', marginBottom: '0.25rem', fontFamily: 'var(--font-space)' }}>Save your API Key</h3>
-              <p style={{ color: '#fca5a5', fontSize: '0.875rem', lineHeight: 1.4 }}>
-                This is the only time your full API key will be displayed. Please copy it and store it securely. We will only show a masked version (e.g. ****{apiKey.slice(-4)}) in the future.
-              </p>
-            </div>
-          </div>
-
-          <div className="form-group" style={{ marginBottom: '2rem' }}>
-            <label>Tenant API Key</label>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <input 
-                type="text" 
-                value={apiKey} 
-                readOnly 
-                className="form-input" 
-                style={{ fontFamily: 'monospace', flex: 1 }} 
-              />
-              <button onClick={handleCopy} className="btn btn-secondary btn-sm" style={{ padding: '0 1rem' }}>
-                {copied ? <Check size={18} color="var(--accent-teal)" /> : <Copy size={18} />}
-              </button>
-            </div>
+        {/* Warning */}
+        <div className="alert alert-warning" style={{ marginBottom: '1.5rem', alignItems: 'flex-start' }}>
+          <AlertTriangle size={15} style={{ flexShrink: 0, marginTop: '0.125rem' }} />
+          <div>
+            <strong style={{ fontWeight: 600 }}>Save your API key now.</strong>{' '}
+            This is the only time the full key will be displayed. We store only a masked
+            version after this screen (…{apiKey.slice(-4)}).
           </div>
         </div>
 
-        <div className="solid-card">
-          <div className="section-header-wrap">
-            <h2 className="section-header">Setup Instructions</h2>
+        {/* API Key */}
+        <div className="card" style={{ marginBottom: '1.5rem' }}>
+          <div className="card-header">
+            <span className="card-title">Your API Key</span>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={handleCopy}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}
+            >
+              {copied ? <Check size={13} /> : <Copy size={13} />}
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+          <div className="code-block" style={{ letterSpacing: '0.03em' }}>
+            {apiKey}
+          </div>
+        </div>
+
+        {/* Setup Instructions */}
+        <div className="card" style={{ marginBottom: '1.5rem' }}>
+          <div style={{ marginBottom: '1.25rem' }}>
+            <div className="card-title" style={{ marginBottom: '0.25rem' }}>Setup instructions</div>
+            <p style={{ fontSize: '0.8125rem', color: 'var(--text-2)' }}>
+              {integrationMode === 'sidecar'
+                ? 'Deploy the Edhir sidecar container in front of your application.'
+                : 'Install the SDK and register it as middleware in your application.'}
+            </p>
           </div>
 
           {integrationMode === 'sidecar' ? (
-            <div>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', fontSize: '0.875rem' }}>
-                Deploy the Edhir sidecar container in front of your application. Ensure you route external traffic to this sidecar instead of directly to your app.
-              </p>
-              <div className="code-block" style={{ marginBottom: '2rem' }}>
-                {`docker run -d \\
+            <div className="code-block">{`docker run -d \\
   -p 8443:8443 \\
   -e EDHIR_API_KEY=${apiKey} \\
   -e TARGET_URL=http://localhost:8080 \\
-  edhir/sidecar:latest`}
-              </div>
-            </div>
+  edhir/sidecar:latest`}</div>
           ) : (
-            <div>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', fontSize: '0.875rem' }}>
-                Install the Edhir SDK via npm or Maven, then configure it as middleware in your application.
-              </p>
-              <h4 style={{ color: 'var(--text-primary)', marginBottom: '0.5rem', fontSize: '0.875rem' }}>1. Install Dependency</h4>
-              <div className="code-block" style={{ marginBottom: '1.5rem' }}>
-                npm install @edhir/sdk
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <p style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-2)', marginBottom: '0.5rem' }}>
+                  1. Install dependency
+                </p>
+                <div className="code-block">npm install @edhir/sdk</div>
               </div>
-              <h4 style={{ color: 'var(--text-primary)', marginBottom: '0.5rem', fontSize: '0.875rem' }}>2. Register Middleware</h4>
-              <div className="code-block" style={{ marginBottom: '2rem' }}>
-                {`import { edhirMiddleware } from '@edhir/sdk';
+              <div>
+                <p style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-2)', marginBottom: '0.5rem' }}>
+                  2. Register middleware
+                </p>
+                <div className="code-block">{`import { edhirMiddleware } from '@edhir/sdk';
 import express from 'express';
 
 const app = express();
 
-// Ensure EDHIR_API_KEY is set in your environment variables
 app.use(edhirMiddleware({
   apiKey: process.env.EDHIR_API_KEY
-}));`}
+}));`}</div>
               </div>
             </div>
           )}
+        </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button className="btn btn-primary" style={{ width: 'auto' }} onClick={onComplete}>
-              I have copied my key and set up my app
-            </button>
-          </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button className="btn btn-primary" onClick={onComplete}>
+            I've copied my key and deployed — go to dashboard
+          </button>
         </div>
       </div>
     </div>

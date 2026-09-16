@@ -1,5 +1,4 @@
-import React from 'react';
-import { ShieldAlert, ShieldCheck, Activity, Target } from 'lucide-react';
+import { Activity, ShieldAlert, ShieldCheck, Target } from 'lucide-react';
 
 interface StatCardsProps {
   isLoading: boolean;
@@ -13,34 +12,60 @@ interface StatCardsProps {
 export function StatCards({ isLoading, isError, total, allowed, blocked, honeypot }: StatCardsProps) {
   if (isError) {
     return (
-      <div className="alert-error">
-        Failed to load statistics.
+      <div className="alert alert-error" style={{ marginBottom: '1rem' }}>
+        Failed to load statistics. The backend may be unavailable.
       </div>
     );
   }
 
   const cards = [
-    { label: "Total Requests", value: total, icon: Activity, classModifier: "" },
-    { label: "Allowed", value: allowed, icon: ShieldCheck, classModifier: "accent-teal" },
-    { label: "Blocked", value: blocked, icon: ShieldAlert, classModifier: "accent-red" },
-    { label: "Honeypot", value: honeypot, icon: Target, classModifier: "" },
+    {
+      label: 'Total Requests',
+      value: total,
+      icon: Activity,
+      dotClass: 'neutral',
+    },
+    {
+      label: 'Allowed',
+      value: allowed,
+      icon: ShieldCheck,
+      dotClass: 'allow',
+    },
+    {
+      label: 'Blocked',
+      value: blocked,
+      icon: ShieldAlert,
+      dotClass: 'block',
+    },
+    {
+      label: 'Honeypot',
+      value: honeypot,
+      icon: Target,
+      dotClass: 'honeypot',
+    },
   ];
 
   return (
-    <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-      {cards.map((c, i) => (
-        <div key={i} className={`solid-card kpi-card ${c.classModifier}`}>
-          <div className="kpi-header">
-            <span className="kpi-title">{c.label}</span>
-            <c.icon className="kpi-icon" />
+    <div className="stat-grid">
+      {cards.map((c) => (
+        <div key={c.label} className="stat-card">
+          <div className="stat-label">
+            <span className={`status-dot ${c.dotClass}`} />
+            {c.label}
           </div>
-          <div className="kpi-body">
-            {isLoading ? (
-              <div className="h-8 w-16 bg-white/10 rounded animate-pulse"></div>
-            ) : (
-              <span className="kpi-value">{c.value.toLocaleString()}</span>
-            )}
-          </div>
+          {isLoading ? (
+            <div
+              style={{
+                height: '1.75rem',
+                width: '5rem',
+                background: 'var(--surface-2)',
+                borderRadius: 'var(--radius)',
+                marginTop: '0.5rem',
+              }}
+            />
+          ) : (
+            <div className="stat-value">{c.value.toLocaleString()}</div>
+          )}
         </div>
       ))}
     </div>

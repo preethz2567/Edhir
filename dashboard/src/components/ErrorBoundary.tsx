@@ -1,43 +1,60 @@
-import React, { Component, ErrorInfo, ReactNode } from "react";
-import { AlertTriangle } from "lucide-react";
+import { Component, ReactNode } from 'react';
 
-interface Props {
-  children?: ReactNode;
-  fallback?: ReactNode;
-}
-
-interface State {
-  hasError: boolean;
-  error?: Error;
-}
+interface Props { children: ReactNode; }
+interface State { hasError: boolean; error?: Error; }
 
 export class ErrorBoundary extends Component<Props, State> {
-  public state: State = {
-    hasError: false
-  };
+  state: State = { hasError: false };
 
-  public static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
   }
 
-  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("Uncaught error:", error, errorInfo);
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('[ErrorBoundary]', error, info);
   }
 
-  public render() {
+  render() {
     if (this.state.hasError) {
-      if (this.props.fallback) {
-        return this.props.fallback;
-      }
       return (
-        <div className="solid-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', color: 'var(--accent-red)' }}>
-          <AlertTriangle style={{ width: '2rem', height: '2rem', marginBottom: '0.5rem', opacity: 0.8 }} />
-          <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '0.25rem', fontFamily: 'var(--font-space)' }}>Component Crashed</h2>
-          <p style={{ fontSize: '0.875rem', opacity: 0.8 }}>{this.state.error?.message}</p>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '200px',
+            padding: '2rem',
+          }}
+        >
+          <div
+            className="card"
+            style={{ maxWidth: 480, textAlign: 'center' }}
+          >
+            <p
+              style={{
+                fontSize: '0.8125rem',
+                fontWeight: 600,
+                color: 'var(--text-1)',
+                marginBottom: '0.375rem',
+              }}
+            >
+              Something went wrong
+            </p>
+            <p
+              style={{ fontSize: '0.75rem', color: 'var(--text-2)', marginBottom: '1.25rem' }}
+            >
+              {this.state.error?.message ?? 'An unexpected error occurred.'}
+            </p>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => this.setState({ hasError: false, error: undefined })}
+            >
+              Try again
+            </button>
+          </div>
         </div>
       );
     }
-
     return this.props.children;
   }
 }

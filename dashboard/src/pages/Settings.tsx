@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDashboardContext } from './Dashboard';
-import { Key, Eye, EyeOff, RefreshCw, Loader2 } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
+import { Eye, EyeOff, RotateCw } from 'lucide-react';
 
 interface TenantDetails {
   id: string;
@@ -11,8 +12,11 @@ interface TenantDetails {
   integrationMode: string;
 }
 
+type ThemeChoice = 'system' | 'light' | 'dark';
+
 export function Settings() {
   const { tenantId } = useDashboardContext();
+  const { theme, setTheme } = useTheme();
   const queryClient = useQueryClient();
   const [showKey, setShowKey] = useState(false);
   const [gracePeriod, setGracePeriod] = useState(24);
@@ -24,121 +28,187 @@ export function Settings() {
       const res = await fetch(`/api/tenants/${tenantId}`);
       if (!res.ok) throw new Error('Failed to fetch tenant details');
       return res.json();
-    }
+    },
   });
 
   const rotateKeyMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/tenants/${tenantId}/rotate-key?gracePeriodHours=${gracePeriod}`, {
-        method: 'POST'
-      });
+      const res = await fetch(
+        `/api/tenants/${tenantId}/rotate-key?gracePeriodHours=${gracePeriod}`,
+        { method: 'POST' }
+      );
       if (!res.ok) throw new Error('Failed to rotate key');
-      return res.text(); // returns new API key
+      return res.text();
     },
     onSuccess: (newKey) => {
-      setRotationMsg(`Key rotated successfully! New key: ${newKey}`);
+      setRotationMsg(`Key rotated. New key: ${newKey}`);
       queryClient.invalidateQueries({ queryKey: ['tenant', tenantId] });
-      setShowKey(true); // force reveal so they see it
+      setShowKey(true);
     },
     onError: (err: any) => {
       setRotationMsg(`Error: ${err.message}`);
-    }
+    },
   });
 
-  if (isLoading || !tenant) {
-    return (
-      <div className="content-wrapper">
-        <div className="content-inner" style={{ display: 'flex', justifyContent: 'center', paddingTop: '4rem' }}>
-          <Loader2 size={48} className="animate-spin" color="var(--accent-teal)" />
-        </div>
-      </div>
-    );
-  }
+  const themeOptions: { value: ThemeChoice; label: string }[] = [
+    { value: 'system', label: 'System' },
+    { value: 'light',  label: 'Light' },
+    { value: 'dark',   label: 'Dark' },
+  ];
 
-  const maskedKey = `****${tenant.apiKey.slice(-4)}`;
+  const maskedKey = tenant ? `****${tenant.apiKey.slice(-4)}` : '••••••••';
 
   return (
-    <div className="content-wrapper">
-      <div className="content-inner">
-        <div className="dashboard-header">
+    <div className="page-wrapper">
+      <div className="page-inner" style={{ maxWidth: 640 }}>
+        <div className="page-header">
           <div>
-            <h1 className="dashboard-title">Settings</h1>
-            <p className="dashboard-subtitle">Manage your tenant configuration</p>
+            <h1 className="page-title">Settings</h1>
+            <p className="page-subtitle">Tenant configuration and preferences</p>
           </div>
         </div>
 
-        <div className="solid-card" style={{ maxWidth: '600px', marginBottom: '2rem' }}>
-          <div className="section-header-wrap">
-            <h2 className="section-header">API Key Management</h2>
-          </div>
-
-          <div className="form-group">
-            <label>Current API Key</label>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <input 
-                type="text" 
-                value={showKey ? tenant.apiKey : maskedKey} 
-                readOnly 
-                className="form-input" 
-                style={{ fontFamily: 'monospace' }} 
-              />
-              <button 
-                onClick={() => setShowKey(!showKey)} 
-                className="btn btn-secondary btn-sm"
-                style={{ padding: '0 1rem' }}
-              >
-                {showKey ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
+        {/* Appearance */}
+        <div className="settings-section">
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">Appearance</span>
+            </div>
+            <div className="settings-row">
+              <div>
+                <div className="settings-row-label">Theme</div>
+                <div className="settings-row-sub">Overrides system preference when set.</div>
+              </div>
+              <div className="theme-toggle-group">
+                {themeOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    className={`theme-toggle-btn ${theme === opt.value ? 'active' : ''}`}
+                    onClick={() => setTheme(opt.value)}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
+        </div>
 
-          <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid var(--surface-border)' }}>
-            <h3 style={{ fontSize: '1rem', fontFamily: 'var(--font-space)', marginBottom: '1rem' }}>Rotate API Key</h3>
-            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-              Regenerate your API key. The old key will continue to work for the specified grace period.
-            </p>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
-              <div className="form-group" style={{ marginBottom: 0, flex: 1 }}>
-                <label>Grace Period (Hours)</label>
-                <input 
-                  type="number" 
-                  min="0"
-                  max="168"
-                  value={gracePeriod} 
-                  onChange={e => setGracePeriod(parseInt(e.target.value) || 0)} 
-                  className="form-input" 
-                />
-              </div>
-              <button 
-                className="btn btn-primary" 
-                style={{ height: '42px', width: 'auto' }}
-                onClick={() => rotateKeyMutation.mutate()}
-                disabled={rotateKeyMutation.isPending}
-              >
-                {rotateKeyMutation.isPending ? 'Rotating...' : <><RefreshCw size={16} /> Regenerate Key</>}
-              </button>
+        {/* API Key */}
+        <div className="settings-section">
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">API Key</span>
             </div>
-            {rotationMsg && (
-              <div style={{ marginTop: '1rem', padding: '0.75rem', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', fontSize: '0.875rem', wordBreak: 'break-all' }}>
-                {rotationMsg}
+
+            <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.75rem' }}>
+              <div className="settings-row-label">Current key</div>
+              <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
+                {isLoading ? (
+                  <div
+                    style={{
+                      flex: 1,
+                      height: 36,
+                      background: 'var(--surface-2)',
+                      borderRadius: 'var(--radius)',
+                    }}
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    readOnly
+                    value={showKey ? tenant?.apiKey ?? '' : maskedKey}
+                    className="form-input"
+                    style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: '0.8125rem' }}
+                  />
+                )}
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setShowKey((s) => !s)}
+                  disabled={isLoading}
+                  title={showKey ? 'Hide key' : 'Reveal key'}
+                >
+                  {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
               </div>
+            </div>
+
+            <div className="divider" />
+
+            <div>
+              <div className="settings-row-label" style={{ marginBottom: '0.25rem' }}>Rotate key</div>
+              <p style={{ fontSize: '0.8125rem', color: 'var(--text-2)', marginBottom: '1rem', lineHeight: 1.5 }}>
+                Generates a new API key. The old key remains valid for the grace period before expiring.
+              </p>
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end' }}>
+                <div className="form-group" style={{ marginBottom: 0, flex: '0 0 180px' }}>
+                  <label className="form-label">Grace period (hours)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={168}
+                    value={gracePeriod}
+                    onChange={(e) => setGracePeriod(parseInt(e.target.value) || 0)}
+                    className="form-input"
+                  />
+                </div>
+                <button
+                  className="btn btn-primary"
+                  style={{ flexShrink: 0 }}
+                  onClick={() => rotateKeyMutation.mutate()}
+                  disabled={rotateKeyMutation.isPending || isLoading}
+                >
+                  <RotateCw size={13} />
+                  {rotateKeyMutation.isPending ? 'Rotating…' : 'Rotate key'}
+                </button>
+              </div>
+              {rotationMsg && (
+                <div
+                  className="alert alert-warning"
+                  style={{ marginTop: '1rem' }}
+                >
+                  {rotationMsg}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Tenant info */}
+        <div className="settings-section">
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">Tenant details</span>
+            </div>
+            {isLoading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    style={{ height: 34, background: 'var(--surface-2)', borderRadius: 'var(--radius)' }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <>
+                <div className="settings-row">
+                  <div className="settings-row-label">Tenant ID</div>
+                  <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-2)' }}>
+                    {tenant?.id}
+                  </span>
+                </div>
+                <div className="settings-row">
+                  <div className="settings-row-label">Application name</div>
+                  <span style={{ fontSize: '0.8125rem', color: 'var(--text-2)' }}>{tenant?.appName}</span>
+                </div>
+                <div className="settings-row">
+                  <div className="settings-row-label">Integration mode</div>
+                  <span className="badge" style={{ textTransform: 'none' }}>
+                    {tenant?.integrationMode === 'sdk' ? 'Native SDK' : 'Sidecar Proxy'}
+                  </span>
+                </div>
+              </>
             )}
-          </div>
-        </div>
-
-        <div className="solid-card" style={{ maxWidth: '600px' }}>
-          <div className="section-header-wrap">
-            <h2 className="section-header">Integration Details</h2>
-          </div>
-          
-          <div className="form-group" style={{ marginBottom: '1rem' }}>
-            <label>Application Name</label>
-            <input type="text" value={tenant.appName} className="form-input" readOnly />
-          </div>
-
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label>Integration Mode</label>
-            <input type="text" value={tenant.integrationMode === 'sdk' ? 'Native SDK' : 'Sidecar Proxy'} className="form-input" readOnly />
           </div>
         </div>
       </div>

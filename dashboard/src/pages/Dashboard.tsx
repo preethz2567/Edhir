@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Outlet, useOutletContext } from 'react-router-dom';
 import { Sidebar } from '../components/Sidebar';
-import { Loader2, Copy, Check } from 'lucide-react';
+import { Copy, Check } from 'lucide-react';
 import { WebSocketProvider } from '../context/WebSocketContext';
 import { RequestRecord } from '../components/LiveFeed';
 
@@ -12,6 +12,7 @@ export interface DashboardResponse {
     total: number;
     allowed: number;
     blocked: number;
+    honeypot: number;
   };
 }
 
@@ -26,14 +27,14 @@ export function useDashboardContext() {
   return useOutletContext<DashboardContextType>();
 }
 
-export function DashboardLayout({ tenantId, onLogout }: { tenantId: string, onLogout: () => void }) {
+export function DashboardLayout({ tenantId, onLogout }: { tenantId: string; onLogout: () => void }) {
   const { data, isLoading, isError } = useQuery<DashboardResponse>({
     queryKey: ['dashboard', tenantId],
     queryFn: async () => {
       const res = await fetch('/api/dashboard/live');
       if (!res.ok) {
         if (res.status === 401) onLogout();
-        throw new Error('Failed to fetch data');
+        throw new Error('Failed to fetch dashboard data');
       }
       return res.json();
     },
@@ -42,51 +43,58 @@ export function DashboardLayout({ tenantId, onLogout }: { tenantId: string, onLo
 
   const [copied, setCopied] = useState(false);
   const handleCopyCurl = () => {
-    navigator.clipboard.writeText(`curl -i http://localhost:8443/`);
+    navigator.clipboard.writeText('curl -i http://localhost:8443/');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Show a "waiting for first request" empty state when backend returns 0 traffic
   const isWaiting = !isLoading && !isError && data?.summary.total === 0;
 
   if (isWaiting) {
     return (
-      <div className="content-wrapper">
-        <div className="content-inner">
-          <div className="dashboard-header">
-            <div>
-              <h1 className="dashboard-title">Security Overview</h1>
-              <p className="dashboard-subtitle">Tenant ID: {tenantId}</p>
-            </div>
-            <button onClick={onLogout} className="btn btn-secondary btn-sm">Sign Out</button>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '100vh',
+          background: 'var(--bg)',
+          padding: '2rem',
+        }}
+      >
+        <div style={{ maxWidth: 520, width: '100%', textAlign: 'center' }}>
+          <div style={{ marginBottom: '0.5rem', fontSize: '0.9375rem', fontWeight: 600, color: 'var(--text-1)' }}>
+            Edhir
           </div>
-          <div className="solid-card text-center" style={{ padding: '4rem 2rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
-              <div style={{ animation: 'spin 2s linear infinite' }}>
-                <Loader2 size={48} color="var(--accent-teal)" />
-              </div>
+          <h1
+            style={{ fontSize: '1.375rem', fontWeight: 600, color: 'var(--text-1)', marginBottom: '0.5rem', letterSpacing: '-0.02em' }}
+          >
+            Waiting for first request
+          </h1>
+          <p
+            style={{ fontSize: '0.875rem', color: 'var(--text-2)', marginBottom: '2rem', lineHeight: 1.6 }}
+          >
+            No traffic has been recorded yet. Send a request through your Edhir
+            sidecar to see it appear here.
+          </p>
+          <div className="card" style={{ textAlign: 'left' }}>
+            <div className="card-header">
+              <span className="card-title">Test connection</span>
+              <button className="btn btn-secondary btn-sm" onClick={handleCopyCurl}>
+                {copied ? <Check size={13} /> : <Copy size={13} />}
+                {copied ? 'Copied' : 'Copy'}
+              </button>
             </div>
-            <style>{`
-              @keyframes spin {
-                from { transform: rotate(0deg); }
-                to { transform: rotate(360deg); }
-              }
-            `}</style>
-            <h2 className="dashboard-title" style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Waiting for first request</h2>
-            <p className="dashboard-subtitle" style={{ marginBottom: '2rem' }}>No traffic yet. Send a test request to see it appear here.</p>
-            
-            <div style={{ display: 'inline-block', textAlign: 'left', background: 'var(--bg-color)', padding: '1.5rem', borderRadius: '8px', border: '1px solid var(--surface-border)', width: '100%', maxWidth: '600px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)' }}>TEST CONNECTION</span>
-                <button onClick={handleCopyCurl} className="btn btn-secondary btn-sm" style={{ padding: '0.25rem 0.75rem', width: 'auto' }}>
-                  {copied ? <Check size={14} color="var(--accent-teal)" /> : <Copy size={14} />} Copy
-                </button>
-              </div>
-              <div style={{ fontFamily: 'monospace', color: 'var(--text-primary)', wordBreak: 'break-all' }}>
-                curl -i http://localhost:8443/
-              </div>
-            </div>
+            <div className="code-block">curl -i http://localhost:8443/</div>
           </div>
+          <button
+            onClick={onLogout}
+            className="btn btn-ghost btn-sm"
+            style={{ marginTop: '1.5rem' }}
+          >
+            Sign out
+          </button>
         </div>
       </div>
     );

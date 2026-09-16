@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 interface SignupProps {
   onSuccess: (apiKey: string, integrationMode: string) => void;
@@ -20,9 +20,7 @@ export function Signup({ onSuccess, onNavigateToLogin }: SignupProps) {
     try {
       const res = await fetch('/api/tenants', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ appName, contactEmail, integrationMode }),
       });
 
@@ -30,7 +28,6 @@ export function Signup({ onSuccess, onNavigateToLogin }: SignupProps) {
         throw new Error('Registration failed. Please try again.');
       }
 
-      // Backend returns the raw string API key
       const apiKey = await res.text();
       onSuccess(apiKey, integrationMode);
     } catch (err: any) {
@@ -41,15 +38,17 @@ export function Signup({ onSuccess, onNavigateToLogin }: SignupProps) {
   };
 
   return (
-    <div className="app-center-wrapper">
-      <div className="solid-card login-card">
-        <h1 className="text-3xl text-center mb-2 dashboard-title">Register</h1>
-        <p className="text-center mb-8 dashboard-subtitle">Create a new Edhir tenant</p>
+    <div className="center-layout">
+      <div className="auth-card" style={{ maxWidth: 420 }}>
+        <span className="auth-logo">Edhir</span>
+        <h1 className="auth-title">Create a tenant</h1>
+        <p className="auth-sub">Register your application to receive an API key.</p>
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>Application Name</label>
+            <label className="form-label" htmlFor="appName">Application name</label>
             <input
+              id="appName"
               type="text"
               value={appName}
               onChange={(e) => setAppName(e.target.value)}
@@ -60,24 +59,25 @@ export function Signup({ onSuccess, onNavigateToLogin }: SignupProps) {
           </div>
 
           <div className="form-group">
-            <label>Contact Email</label>
+            <label className="form-label" htmlFor="contactEmail">Contact email</label>
             <input
+              id="contactEmail"
               type="email"
               value={contactEmail}
               onChange={(e) => setContactEmail(e.target.value)}
               className="form-input"
-              placeholder="admin@acme.com"
+              placeholder="admin@example.com"
               required
             />
           </div>
 
           <div className="form-group">
-            <label>Integration Mode</label>
+            <label className="form-label" htmlFor="integrationMode">Integration mode</label>
             <select
+              id="integrationMode"
               value={integrationMode}
               onChange={(e) => setIntegrationMode(e.target.value)}
-              className="form-input"
-              style={{ appearance: 'auto' }}
+              className="form-input form-select"
             >
               <option value="sidecar">Sidecar Proxy</option>
               <option value="sdk">Native SDK</option>
@@ -85,7 +85,7 @@ export function Signup({ onSuccess, onNavigateToLogin }: SignupProps) {
           </div>
 
           {error && (
-            <div className="alert-error">
+            <div className="alert alert-error" style={{ marginBottom: '1rem' }}>
               {error}
             </div>
           )}
@@ -93,17 +93,20 @@ export function Signup({ onSuccess, onNavigateToLogin }: SignupProps) {
           <button
             type="submit"
             disabled={loading}
-            className="btn btn-primary mb-2"
+            className="btn btn-primary btn-full"
+            style={{ marginBottom: '0.5rem' }}
           >
-            {loading ? 'Registering...' : 'Sign Up'}
+            {loading
+              ? <><div className="spinner" style={{ width: 14, height: 14 }} /> Creating tenant…</>
+              : 'Create tenant'}
           </button>
-          
+
           <button
             type="button"
-            className="btn btn-secondary"
+            className="btn btn-ghost btn-full"
             onClick={onNavigateToLogin}
           >
-            Already have an API Key? Log in
+            Already have an API key? Sign in
           </button>
         </form>
       </div>

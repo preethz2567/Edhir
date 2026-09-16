@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Target, ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
-interface CampaignMock {
+interface Campaign {
   id: string;
   name: string;
   sessionCount: number;
@@ -9,9 +9,11 @@ interface CampaignMock {
   firstSeen: string;
   lastSeen: string;
   sessions: string[];
+  attackType: string;
 }
 
-const mockCampaigns: CampaignMock[] = [
+// Mock data — backend campaigns API not yet implemented
+const mockCampaigns: Campaign[] = [
   {
     id: 'camp-1029',
     name: 'Distributed SQLi Scan',
@@ -19,75 +21,141 @@ const mockCampaigns: CampaignMock[] = [
     severity: 'high',
     firstSeen: new Date(Date.now() - 3600000 * 24).toISOString(),
     lastSeen: new Date(Date.now() - 3600000 * 2).toISOString(),
-    sessions: ['sess-a1', 'sess-b2', 'sess-c3']
+    sessions: ['sess-a1b2c3', 'sess-d4e5f6', 'sess-g7h8i9'],
+    attackType: 'SQL Injection',
   },
   {
     id: 'camp-1030',
-    name: 'Credential Stuffing via Auth API',
+    name: 'Credential Stuffing — Auth API',
     sessionCount: 120,
     severity: 'medium',
     firstSeen: new Date(Date.now() - 3600000 * 48).toISOString(),
     lastSeen: new Date(Date.now() - 3600000 * 12).toISOString(),
-    sessions: ['sess-x9', 'sess-y8']
-  }
+    sessions: ['sess-x9y8z7', 'sess-u1v2w3'],
+    attackType: 'Credential Stuffing',
+  },
+  {
+    id: 'camp-1031',
+    name: 'Slow-drip Path Enumeration',
+    sessionCount: 8,
+    severity: 'low',
+    firstSeen: new Date(Date.now() - 3600000 * 6).toISOString(),
+    lastSeen: new Date(Date.now() - 3600000 * 1).toISOString(),
+    sessions: ['sess-m1n2o3'],
+    attackType: 'Path Traversal',
+  },
 ];
+
+function fmt(iso: string) {
+  return new Date(iso).toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
 export function Campaigns() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-
-  const toggle = (id: string) => setExpanded(p => ({ ...p, [id]: !p[id] }));
+  const toggle = (id: string) =>
+    setExpanded((p) => ({ ...p, [id]: !p[id] }));
 
   return (
-    <div className="content-wrapper">
-      <div className="content-inner">
-        <div className="dashboard-header">
+    <div className="page-wrapper">
+      <div className="page-inner">
+        <div className="page-header">
           <div>
-            <h1 className="dashboard-title">Campaigns</h1>
-            <p className="dashboard-subtitle">Correlated attack campaigns and threat clusters</p>
+            <h1 className="page-title">Campaigns</h1>
+            <p className="page-subtitle">Correlated attack clusters detected across sessions</p>
           </div>
+          <span
+            style={{
+              fontSize: '0.6875rem',
+              color: 'var(--text-3)',
+              fontStyle: 'italic',
+            }}
+          >
+            Demo data — live campaign API coming soon
+          </span>
         </div>
 
-        <div className="list-container">
-          {mockCampaigns.map(camp => (
-            <div key={camp.id} className="solid-card" style={{ padding: '1rem 1.5rem' }}>
-              <div 
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+        <div className="data-table">
+          {/* Column header */}
+          <div
+            className="data-row header-row"
+            style={{ gridTemplateColumns: '1fr 8rem 6rem 10rem 10rem 5.5rem' }}
+          >
+            <div className="data-cell">Name</div>
+            <div className="data-cell">Type</div>
+            <div className="data-cell">Sessions</div>
+            <div className="data-cell">First seen</div>
+            <div className="data-cell">Last seen</div>
+            <div className="data-cell" style={{ textAlign: 'right' }}>Severity</div>
+          </div>
+
+          {mockCampaigns.map((camp) => (
+            <React.Fragment key={camp.id}>
+              <div
+                className="data-row"
+                style={{
+                  gridTemplateColumns: '1fr 8rem 6rem 10rem 10rem 5.5rem',
+                  cursor: 'pointer',
+                }}
                 onClick={() => toggle(camp.id)}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  {expanded[camp.id] ? <ChevronDown size={20} color="var(--text-secondary)"/> : <ChevronRight size={20} color="var(--text-secondary)"/>}
-                  <div>
-                    <h3 style={{ fontSize: '1.125rem', fontFamily: 'var(--font-space)', margin: 0, color: 'var(--text-primary)' }}>{camp.name}</h3>
-                    <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                      First seen: {new Date(camp.firstSeen).toLocaleString()}
-                    </p>
-                  </div>
+                <div className="data-cell" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {expanded[camp.id]
+                    ? <ChevronDown size={13} color="var(--text-3)" />
+                    : <ChevronRight size={13} color="var(--text-3)" />}
+                  <span style={{ fontWeight: 500 }}>{camp.name}</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '1.25rem', fontFamily: 'var(--font-space)', fontWeight: 700 }}>{camp.sessionCount}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Sessions</div>
-                  </div>
-                  <div className={`delta-pill ${camp.severity === 'high' ? 'danger' : 'positive'}`} style={{ width: '80px', justifyContent: 'center' }}>
-                    <Target size={14} /> {camp.severity}
-                  </div>
+                <div className="data-cell" style={{ fontSize: '0.75rem', color: 'var(--text-2)' }}>
+                  {camp.attackType}
+                </div>
+                <div className="data-cell mono">{camp.sessionCount}</div>
+                <div className="data-cell" style={{ fontSize: '0.75rem', color: 'var(--text-2)' }}>
+                  {fmt(camp.firstSeen)}
+                </div>
+                <div className="data-cell" style={{ fontSize: '0.75rem', color: 'var(--text-2)' }}>
+                  {fmt(camp.lastSeen)}
+                </div>
+                <div className="data-cell" style={{ textAlign: 'right' }}>
+                  <span className={`badge ${camp.severity}`}>{camp.severity}</span>
                 </div>
               </div>
 
+              {/* Expanded — session list */}
               {expanded[camp.id] && (
-                <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--surface-border)' }}>
-                  <h4 style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1rem', textTransform: 'uppercase' }}>Involved Sessions</h4>
-                  <div className="list-container">
-                    {camp.sessions.map(s => (
-                      <div key={s} className="list-item" style={{ padding: '0.5rem 1rem', background: 'var(--bg-color)' }}>
-                        <span className="item-id">{s}</span>
-                        <span className="item-meta">Active between {new Date(camp.firstSeen).toLocaleTimeString()} and {new Date(camp.lastSeen).toLocaleTimeString()}</span>
-                      </div>
-                    ))}
-                  </div>
+                <div
+                  style={{
+                    borderBottom: '1px solid var(--border)',
+                    background: 'var(--bg)',
+                    padding: '0.75rem 1.25rem 0.75rem 3rem',
+                  }}
+                >
+                  <p style={{ fontSize: '0.6875rem', fontWeight: 500, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>
+                    Involved sessions
+                  </p>
+                  {camp.sessions.map((s) => (
+                    <div
+                      key={s}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        padding: '0.3125rem 0',
+                        borderBottom: '1px solid var(--border)',
+                        fontSize: '0.8125rem',
+                      }}
+                    >
+                      <span className="mono" style={{ color: 'var(--text-2)' }}>{s}</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-3)' }}>
+                        {fmt(camp.firstSeen)} — {fmt(camp.lastSeen)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               )}
-            </div>
+            </React.Fragment>
           ))}
         </div>
       </div>

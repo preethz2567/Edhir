@@ -1,56 +1,62 @@
-import React from 'react';
 import { useDashboardContext } from './Dashboard';
 import { StatCards } from '../components/StatCards';
 import { LiveFeed } from '../components/LiveFeed';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { Link } from 'react-router-dom';
+import { ArrowRight } from 'lucide-react';
 
 export function Overview() {
   const { dashboardData, isLoading, isError } = useDashboardContext();
 
   return (
-    <div className="content-wrapper">
-      <div className="content-inner">
-        <div className="dashboard-header">
+    <div className="page-wrapper">
+      <div className="page-inner">
+        <div className="page-header">
           <div>
-            <h1 className="dashboard-title">Overview</h1>
-            <p className="dashboard-subtitle">At-a-glance security metrics</p>
+            <h1 className="page-title">Overview</h1>
+            <p className="page-subtitle">Security summary for this tenant</p>
           </div>
         </div>
 
-        {/* System Status Mock */}
-        <div style={{ background: 'var(--accent-red-glow)', border: '1px solid var(--accent-red)', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-red)' }} />
-          <p style={{ color: '#fca5a5', fontSize: '0.875rem' }}>
-            <strong style={{ color: 'var(--accent-red)' }}>ML Service Offline:</strong> Running in fast-path-only mode (circuit breaker open).
-          </p>
-        </div>
-
         <ErrorBoundary>
-          <StatCards 
+          <StatCards
             isLoading={isLoading}
             isError={isError}
-            total={dashboardData?.summary.total || 0}
-            allowed={dashboardData?.summary.allowed || 0}
-            blocked={dashboardData?.summary.blocked || 0}
-            honeypot={0} 
+            total={dashboardData?.summary.total ?? 0}
+            allowed={dashboardData?.summary.allowed ?? 0}
+            blocked={dashboardData?.summary.blocked ?? 0}
+            honeypot={dashboardData?.summary.honeypot ?? 0}
           />
         </ErrorBoundary>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px', marginTop: '1.5rem' }}>
+        <div className="overview-grid">
           <ErrorBoundary>
-            <LiveFeed 
-              tenantId={null} // Handled by Context now
-              initialData={dashboardData?.requests || []}
+            <LiveFeed
+              tenantId={null}
+              initialData={dashboardData?.requests ?? []}
               isLoading={isLoading}
             />
           </ErrorBoundary>
 
-          <div className="solid-card" style={{ alignSelf: 'start' }}>
-            <div className="section-header-wrap">
-              <h2 className="section-header">Recent Campaigns</h2>
+          {/* Recent campaigns summary */}
+          <div className="data-table" style={{ alignSelf: 'start' }}>
+            <div className="data-table-header">
+              <span className="card-title">Campaigns</span>
+              <Link
+                to="/app/campaigns"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  fontSize: '0.75rem',
+                  color: 'var(--text-2)',
+                }}
+              >
+                View all <ArrowRight size={12} />
+              </Link>
             </div>
-            <div className="empty-state" style={{ padding: '2rem 1rem' }}>
-              <p>No active campaigns detected in the last 24 hours.</p>
+            <div className="empty-state" style={{ padding: '2.5rem 1rem' }}>
+              <p className="empty-desc">No active campaigns in the last 24 hours.</p>
             </div>
           </div>
         </div>
