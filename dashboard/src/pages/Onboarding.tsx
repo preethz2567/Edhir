@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, Copy, AlertTriangle } from 'lucide-react';
+import { Check, Copy, AlertTriangle, Hexagon } from 'lucide-react';
 
 interface OnboardingProps {
   apiKey: string;
@@ -21,8 +21,11 @@ export function Onboarding({ apiKey, integrationMode, onComplete }: OnboardingPr
       <div className="onboarding-inner">
         {/* Header */}
         <div style={{ marginBottom: '2rem' }}>
-          <div style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--text-1)', marginBottom: '0.25rem' }}>
-            Edhir
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <Hexagon size={24} style={{ color: 'var(--accent)' }} />
+            <div style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--text-1)' }}>
+              Edhir
+            </div>
           </div>
           <h1 style={{ fontSize: '1.375rem', fontWeight: 600, color: 'var(--text-1)', letterSpacing: '-0.02em', marginBottom: '0.375rem' }}>
             Tenant created
@@ -104,7 +107,7 @@ app.use(edhirMiddleware({
 
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <button className="btn btn-primary" onClick={onComplete}>
-            I've copied my key and deployed — go to dashboard
+            I've copied my key and deployed - go to dashboard
           </button>
         </div>
       </div>

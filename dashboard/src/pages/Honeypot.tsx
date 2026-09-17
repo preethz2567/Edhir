@@ -41,7 +41,7 @@ const mockEvents: HoneypotEvent[] = [
     id: 'hp-5',
     sessionId: 'sess-n7o8p9q0',
     timestamp: new Date(Date.now() - 5_400_000).toISOString(),
-    actionObserved: 'Awaiting analysis — session still active',
+    actionObserved: 'Awaiting analysis - session still active',
     resolvedVerdict: 'pending',
   },
 ];
@@ -84,7 +84,7 @@ export function Honeypot() {
               fontStyle: 'italic',
             }}
           >
-            Demo data — live honeypot API coming soon
+            Demo data - live honeypot API coming soon
           </span>
         </div>
 

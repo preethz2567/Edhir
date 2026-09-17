@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Activity, Target, Shield,
-  AlertTriangle, Settings, LogOut, Menu, X,
+  AlertTriangle, Settings, LogOut, Menu, X, Hexagon,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -25,7 +25,10 @@ export function Sidebar({ onLogout, tenantId }: SidebarProps) {
   const navContent = (
     <>
       <div className="sidebar-logo">
-        <div className="sidebar-wordmark">Edhir</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Hexagon size={24} style={{ color: 'var(--accent)' }} />
+          <div className="sidebar-wordmark">Edhir</div>
+        </div>
         <div className="sidebar-tenant">
           {tenantId.substring(0, 12)}…
         </div>
@@ -60,7 +63,11 @@ export function Sidebar({ onLogout, tenantId }: SidebarProps) {
   return (
     <>
       {/* Mobile top bar */}
-      <div className="mobile-topbar">
+      <div className="mobile-topbar md:hidden">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Hexagon size={20} style={{ color: 'var(--accent)' }} />
+          <span className="mobile-topbar-title">Edhir</span>
+        </div>
         <button
           className="btn-icon"
           onClick={() => setOpen(true)}
@@ -68,8 +75,6 @@ export function Sidebar({ onLogout, tenantId }: SidebarProps) {
         >
           <Menu size={18} />
         </button>
-        <span className="mobile-topbar-title">Edhir</span>
-        <div style={{ width: 34 }} />
       </div>
 
       {/* Overlay (mobile) */}

@@ -26,7 +26,7 @@ const mockCampaigns: Campaign[] = [
   },
   {
     id: 'camp-1030',
-    name: 'Credential Stuffing — Auth API',
+    name: 'Credential Stuffing - Auth API',
     sessionCount: 120,
     severity: 'medium',
     firstSeen: new Date(Date.now() - 3600000 * 48).toISOString(),
@@ -75,7 +75,7 @@ export function Campaigns() {
               fontStyle: 'italic',
             }}
           >
-            Demo data — live campaign API coming soon
+            Demo data - live campaign API coming soon
           </span>
         </div>
 
@@ -149,7 +149,7 @@ export function Campaigns() {
                     >
                       <span className="mono" style={{ color: 'var(--text-2)' }}>{s}</span>
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-3)' }}>
-                        {fmt(camp.firstSeen)} — {fmt(camp.lastSeen)}
+                        {fmt(camp.firstSeen)} - {fmt(camp.lastSeen)}
                       </span>
                     </div>
                   ))}
