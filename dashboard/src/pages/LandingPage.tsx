@@ -1,12 +1,15 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Activity, Shield, Target } from 'lucide-react';
+import { ArrowRight, Activity, Shield, Target, Hexagon } from 'lucide-react';
 
 export function LandingPage() {
   return (
     <div className="mkt-page">
       {/* Nav */}
       <nav className="mkt-nav">
-        <span className="mkt-nav-logo">Edhir</span>
+        <div className="mkt-nav-brand" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Hexagon size={24} style={{ color: 'var(--accent)' }} />
+          <span className="mkt-nav-logo">Edhir</span>
+        </div>
         <div className="mkt-nav-links">
           <a href="#how-it-works" className="mkt-nav-link">How it works</a>
           <a href="#integrations" className="mkt-nav-link">Integrations</a>
@@ -28,7 +31,7 @@ export function LandingPage() {
         <p className="mkt-hero-sub">
           Edhir sits in front of your application and learns your traffic patterns.
           It blocks threats, adapts thresholds automatically, and routes uncertain
-          actors to honeypots — without changing a line of your code.
+          actors to honeypots - without changing a line of your code.
         </p>
         <div className="mkt-hero-actions">
           <Link to="/app" className="btn btn-primary">
@@ -53,7 +56,7 @@ export function LandingPage() {
           <div className="mkt-grid">
             <div className="mkt-grid-item">
               <Shield size={18} className="mkt-grid-icon" />
-              <div className="mkt-grid-title">1 — Register</div>
+              <div className="mkt-grid-title">1 - Register</div>
               <p className="mkt-grid-text">
                 Create a tenant in the dashboard. Receive a secure API key that
                 identifies your application's traffic stream.
@@ -61,7 +64,7 @@ export function LandingPage() {
             </div>
             <div className="mkt-grid-item">
               <Activity size={18} className="mkt-grid-icon" />
-              <div className="mkt-grid-title">2 — Deploy</div>
+              <div className="mkt-grid-title">2 - Deploy</div>
               <p className="mkt-grid-text">
                 Run a single Docker command to place the Edhir sidecar in front
                 of your application, or add the SDK middleware directly.
@@ -69,7 +72,7 @@ export function LandingPage() {
             </div>
             <div className="mkt-grid-item">
               <Target size={18} className="mkt-grid-icon" />
-              <div className="mkt-grid-title">3 — Monitor</div>
+              <div className="mkt-grid-title">3 - Monitor</div>
               <p className="mkt-grid-text">
                 Watch live traffic, inspect blocked requests, and review campaign
                 clusters from the dashboard. Thresholds adapt automatically.
@@ -86,15 +89,15 @@ export function LandingPage() {
           <h2 className="mkt-section-title">Built for evasion-resistant detection</h2>
           <p className="mkt-section-sub">
             Signature lists are easily bypassed. Edhir focuses on behavioral
-            patterns and timing — the things attackers cannot easily change.
+            patterns and timing - the things attackers cannot easily change.
           </p>
 
           <div className="mkt-grid">
             <div className="mkt-grid-item" style={{ background: 'var(--bg)' }}>
               <div className="mkt-grid-title">Behavioral detection</div>
               <p className="mkt-grid-text">
-                Analyzes the cadence, spread, and shape of requests across sessions —
-                not just their content — to identify coordinated attacks.
+                Analyzes the cadence, spread, and shape of requests across sessions -
+                not just their content - to identify coordinated attacks.
               </p>
             </div>
             <div className="mkt-grid-item" style={{ background: 'var(--bg)' }}>

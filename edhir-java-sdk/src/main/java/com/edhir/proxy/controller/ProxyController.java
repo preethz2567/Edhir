@@ -138,6 +138,26 @@ public class ProxyController {
             String fingerprint = computeFingerprint(httpRequest);
             SessionEntity session = resolveSessionSafe(fingerprint, tenant);
             
+            // Step 2.5: Adaptive Honeypot routing
+            float currentScore = session.getCurrentScore();
+            
+            // Detect anomaly trend (using slope of 5.0f as sensitivity)
+            boolean trending = adaptiveController.detectTrend(session.getId().toString(), currentScore, 5.0f);
+            
+            // Adjust threshold
+            float baseThreshold = 80.0f;
+            float newThreshold = adaptiveController.getAdjustedThreshold(session.getId().toString(), currentScore, baseThreshold, 40.0f, trending);
+
+            if (currentScore >= newThreshold) {
+                boolean redirect = honeypotRouter.shouldRedirect(currentScore, newThreshold);
+                if (redirect) {
+                    persistAndPublish(session, httpRequest, null, "honeypot", startMs);
+                    return ResponseEntity.status(HttpStatus.FOUND)
+                            .header(HttpHeaders.LOCATION, "/honeypot-sinkhole")
+                            .build();
+                }
+            }
+
             // Step 3: Rate limit check (Fail-open aware)
             boolean limitExceeded = false;
             try {
@@ -156,6 +176,8 @@ public class ProxyController {
                 return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                         .body("Edhir: rate limit exceeded");
             }
+
+
 
             // Step 4: Rule engine evaluation (Fail-open aware)
             String queryString = httpRequest.getQueryString();
@@ -176,31 +198,6 @@ public class ProxyController {
                 persistAndPublish(session, httpRequest, verdict.getMatchedRuleId(), "block", startMs);
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                         .body("Edhir: request blocked by rule " + verdict.getMatchedRuleId());
-            }
-
-            // Step 4.5: Adaptive Detection and Honeypot Routing
-            float currentScore = session.getCurrentScore();
-            boolean isTrending = adaptiveController.detectTrend(session.getId().toString(), currentScore, tenant.getAdaptiveSensitivity());
-            float newThreshold = adaptiveController.getAdjustedThreshold(session.getId().toString(), currentScore, 80.0f, tenant.getAdaptiveFloor(), isTrending);
-            
-            // Update session threshold if changed
-            if (session.getCurrentThreshold() != newThreshold) {
-                session.setCurrentThreshold(newThreshold);
-                sessionRepository.save(session);
-            }
-
-            if (currentScore >= newThreshold) {
-                boolean redirect = honeypotRouter.shouldRedirect(currentScore, newThreshold);
-                if (redirect) {
-                    persistAndPublish(session, httpRequest, null, "honeypot", startMs);
-                    return ResponseEntity.status(HttpStatus.FOUND)
-                            .header(HttpHeaders.LOCATION, "/honeypot-sinkhole")
-                            .build();
-                } else {
-                    persistAndPublish(session, httpRequest, null, "block", startMs);
-                    return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                            .body("Edhir: request blocked by adaptive score threshold");
-                }
             }
 
             // Step 5: Forward request to demo-app using Resilience4j

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
 import { ThemeProvider } from './context/ThemeContext';
 import { LandingPage } from './pages/LandingPage';
 import { Login } from './pages/Login';
@@ -16,19 +16,23 @@ import { Settings } from './pages/Settings';
 import { NotFound } from './pages/NotFound';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      staleTime: 5_000,
-    },
-  },
-});
+
 
 function DashboardApp() {
-  const [tenantId, setTenantId] = useState<string | null>(null);
+  const [tenantId, setTenantId] = useState<string | null>(() => {
+    return localStorage.getItem('edhirTenantId');
+  });
   const [authView, setAuthView] = useState<'login' | 'signup'>('login');
   const [onboardingData, setOnboardingData] = useState<{ apiKey: string; integrationMode: string } | null>(null);
+
+  const handleSetTenantId = (id: string | null) => {
+    if (id) {
+      localStorage.setItem('edhirTenantId', id);
+    } else {
+      localStorage.removeItem('edhirTenantId');
+    }
+    setTenantId(id);
+  };
 
   const handleSignupSuccess = async (apiKey: string, integrationMode: string) => {
     try {
@@ -39,7 +43,7 @@ function DashboardApp() {
       });
       if (res.ok) {
         const data = await res.json();
-        setTenantId(data.tenantId);
+        handleSetTenantId(data.tenantId);
         setOnboardingData({ apiKey, integrationMode });
       } else {
         console.error('Auto-login failed', await res.text());
@@ -55,7 +59,7 @@ function DashboardApp() {
       <ErrorBoundary>
         {authView === 'login' ? (
           <Login
-            onSuccess={setTenantId}
+            onSuccess={handleSetTenantId}
             onNavigateToSignup={() => setAuthView('signup')}
           />
         ) : (
@@ -85,7 +89,7 @@ function DashboardApp() {
   return (
     <ErrorBoundary>
       <Routes>
-        <Route element={<DashboardLayout tenantId={tenantId} onLogout={() => setTenantId(null)} />}>
+        <Route element={<DashboardLayout tenantId={tenantId} onLogout={() => handleSetTenantId(null)} />}>
           <Route path="overview"  element={<Overview />} />
           <Route path="traffic"   element={<Traffic />} />
           <Route path="campaigns" element={<Campaigns />} />
@@ -103,15 +107,13 @@ function DashboardApp() {
 function App() {
   return (
     <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/"      element={<LandingPage />} />
-            <Route path="/app/*" element={<DashboardApp />} />
-            <Route path="*"      element={<Navigate to="/" replace />} />
-          </Routes>
-        </BrowserRouter>
-      </QueryClientProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/"      element={<LandingPage />} />
+          <Route path="/app/*" element={<DashboardApp />} />
+          <Route path="*"      element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
     </ThemeProvider>
   );
 }

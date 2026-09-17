@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Hexagon } from 'lucide-react';
+import authIllustration from '../assets/auth-illustration.jpg';
 
 interface LoginProps {
   onSuccess: (tenantId: string) => void;
@@ -37,52 +39,60 @@ export function Login({ onSuccess, onNavigateToSignup }: LoginProps) {
   };
 
   return (
-    <div className="center-layout">
-      <div className="auth-card">
-        <span className="auth-logo">Edhir</span>
-        <h1 className="auth-title">Sign in</h1>
-        <p className="auth-sub">Enter your tenant API key to continue.</p>
-
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label" htmlFor="apiKey">
-              API Key
-            </label>
-            <input
-              id="apiKey"
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              className="form-input"
-              placeholder="edhir_live_…"
-              autoComplete="current-password"
-              required
-            />
+    <div className="auth-layout">
+      <div className="auth-illustration-panel">
+        <img src={authIllustration} alt="Edhir Security" className="auth-illustration-img" />
+      </div>
+      <div className="auth-content">
+        <div className="auth-card">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+            <Hexagon size={28} style={{ color: 'var(--accent)' }} />
+            <span className="auth-logo" style={{ marginBottom: 0 }}>Edhir</span>
           </div>
+          <h1 className="auth-title">Sign in</h1>
+          <p className="auth-sub">Enter your tenant API key to continue.</p>
 
-          {error && (
-            <div className="alert alert-error" style={{ marginBottom: '1rem' }}>
-              {error}
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label className="form-label" htmlFor="apiKey">
+                API Key
+              </label>
+              <input
+                id="apiKey"
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                className="form-input"
+                placeholder="edhir_live_…"
+                autoComplete="current-password"
+                required
+              />
             </div>
-          )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn btn-primary btn-full"
-            style={{ marginBottom: '0.5rem' }}
-          >
-            {loading ? <><div className="spinner" style={{ width: 14, height: 14 }} /> Signing in…</> : 'Sign in'}
-          </button>
+            {error && (
+              <div className="alert alert-error" style={{ marginBottom: '1rem' }}>
+                {error}
+              </div>
+            )}
 
-          <button
-            type="button"
-            className="btn btn-ghost btn-full"
-            onClick={onNavigateToSignup}
-          >
-            Create a new tenant
-          </button>
-        </form>
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn btn-primary btn-full"
+              style={{ marginBottom: '0.5rem' }}
+            >
+              {loading ? <><div className="spinner" style={{ width: 14, height: 14 }} /> Signing in…</> : 'Sign in'}
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-ghost btn-full"
+              onClick={onNavigateToSignup}
+            >
+              Create a new tenant
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );

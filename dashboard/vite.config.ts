@@ -5,6 +5,9 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  define: {
+    global: 'window',
+  },
   server: {
     port: 3000,
     proxy: {
@@ -13,7 +16,7 @@ export default defineConfig({
         changeOrigin: true
       },
       '/ws': {
-        target: 'ws://proxy-service:8080',
+        target: 'http://proxy-service:8080',
         ws: true,
         changeOrigin: true
       }
